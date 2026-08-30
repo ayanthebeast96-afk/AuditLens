@@ -78,7 +78,7 @@ const sampleTransactions: Transaction[] = [
 ];
 
 const testDefinitions: { type: ExceptionType; label: string; rule: string; tone: string }[] = [
-  { type: 'Duplicate transaction', label: 'Duplicate transactions', rule: 'Same vendor, date, amount, and description', tone: 'rose' },
+  { type: 'Duplicate transaction', label: 'Duplicate transactions', rule: 'Same vendor and account, amount within $1, posted within 3 days', tone: 'rose' },
   { type: 'Approval proximity', label: 'Approval threshold proximity', rule: 'Amount falls within 5% below approval threshold', tone: 'amber' },
   { type: 'Weekend posting', label: 'Weekend postings', rule: 'Transaction date is Saturday or Sunday', tone: 'sky' },
   { type: 'Unusually large', label: 'Unusually large transactions', rule: 'Amount is at least $25,000', tone: 'plum' },
@@ -89,23 +89,46 @@ const currency = (value: number) => value.toLocaleString('en-US', { style: 'curr
 const compactCurrency = (value: number) => value >= 1000000 ? `$${(value / 1000000).toFixed(1)}m` : value >= 1000 ? `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k` : currency(value);
 const dateLabel = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const isWeekend = (value: string) => [0, 6].includes(new Date(`${value}T12:00:00`).getDay());
+const calendarDay = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return Date.UTC(year, month - 1, day);
+};
+const calendarDayDistance = (first: string, second: string) => {
+  const firstDay = calendarDay(first);
+  const secondDay = calendarDay(second);
+  return Number.isFinite(firstDay) && Number.isFinite(secondDay)
+    ? Math.round(Math.abs(firstDay - secondDay) / 86_400_000)
+    : Number.POSITIVE_INFINITY;
+};
 const riskWeight: Record<Risk, number> = { Low: 1, Medium: 2, High: 3 };
 
 function analyze(transactions: Transaction[], threshold: number): Finding[] {
   const counts = transactions.reduce<Record<string, number>>((acc, tx) => ({ ...acc, [tx.vendor]: (acc[tx.vendor] ?? 0) + 1 }), {});
-  const duplicates = new Map<string, string[]>();
-  transactions.forEach((tx) => {
-    const key = `${tx.vendor}|${tx.date}|${tx.amount}|${tx.description}`.toLowerCase();
-    duplicates.set(key, [...(duplicates.get(key) ?? []), tx.id]);
-  });
   const result: Finding[] = [];
   transactions.forEach((tx) => {
-    const key = `${tx.vendor}|${tx.date}|${tx.amount}|${tx.description}`.toLowerCase();
-    const duplicateIds = duplicates.get(key) ?? [];
+    const duplicateMatches = transactions.filter((candidate) =>
+      candidate.id !== tx.id
+      && candidate.vendor.trim().toLowerCase() === tx.vendor.trim().toLowerCase()
+      && candidate.account.trim().toLowerCase() === tx.account.trim().toLowerCase()
+      && Math.abs(candidate.amount - tx.amount) <= 1
+      && calendarDayDistance(candidate.date, tx.date) <= 3,
+    );
     const exceptions: TriggeredException[] = [];
     const add = (type: ExceptionType, risk: Risk, why: string, details: string, related: string[], followUp: string) =>
       exceptions.push({ type, risk, why, details, related, followUp });
-    if (duplicateIds.length > 1) add('Duplicate transaction', 'High', 'An identical posting appears in the same review period.', `${duplicateIds.length} postings share the same vendor, date, amount, and description.`, duplicateIds.filter((id) => id !== tx.id), 'Compare the source invoice and approval trail; reverse any duplicate posting after confirmation.');
+    if (duplicateMatches.length > 0) {
+      const duplicateDetails = duplicateMatches.map((match) => {
+        const daysApart = calendarDayDistance(tx.date, match.date);
+        const dayLabel = daysApart === 1 ? 'day' : 'days';
+        const timing = daysApart === 0
+          ? `posted on the same date (${dateLabel(match.date)})`
+          : calendarDay(match.date) < calendarDay(tx.date)
+            ? `posted ${daysApart} ${dayLabel} earlier (${dateLabel(match.date)})`
+            : `posted ${daysApart} ${dayLabel} later (${dateLabel(match.date)})`;
+        return `Matches transaction ${match.id}, ${timing}; this transaction was posted ${dateLabel(tx.date)}. Both use the same vendor and account, with amount within $1.`;
+      }).join(' ');
+      add('Duplicate transaction', 'High', 'A nearby posting matches the same vendor, account, and amount within the three-day review window.', duplicateDetails, duplicateMatches.map((match) => match.id), 'Compare the source invoice and approval trail for each related posting; reverse any duplicate posting after confirmation.');
+    }
     if (tx.amount >= threshold * 0.95 && tx.amount < threshold) add('Approval proximity', 'Medium', `The amount is ${currency(threshold - tx.amount)} below the configured approval threshold.`, `${currency(tx.amount)} is within the 5% proximity band below ${currency(threshold)}.`, [], 'Inspect the approval matrix and confirm the spend was reviewed at the appropriate level.');
     if (isWeekend(tx.date)) add('Weekend posting', 'Low', 'This transaction was posted on a Saturday or Sunday.', `${dateLabel(tx.date)} falls outside the standard Monday–Friday posting window.`, [], 'Confirm the posting date, supporting document date, and whether a period-end adjustment explains the timing.');
     if (tx.amount >= 25000) add('Unusually large', 'High', 'The amount is materially larger than routine ledger activity.', `${currency(tx.amount)} exceeds the deterministic $25,000 large-transaction marker.`, [], 'Vouch to contract, invoice, receipt, and evidence of service delivery. Confirm authorization.');
