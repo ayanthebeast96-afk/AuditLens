@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AuditLens"
+description = "A professional accounting and audit analytics dashboard for reviewing fictional general ledger transactions, surfacing transparent audit exceptions, and investigating related activity."
+version = "1.0.0"
+id = "artifacts/auditlens"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25407
+
+[services.development]
+run = "pnpm --filter @workspace/auditlens run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/auditlens", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/auditlens/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25407"
+BASE_PATH = "/"
