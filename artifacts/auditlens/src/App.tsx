@@ -35,7 +35,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 type Risk = 'High' | 'Medium' | 'Low';
-type ExceptionType = 'Duplicate transaction' | 'Approval proximity' | 'Weekend posting' | 'Unusually large' | 'New vendor risk';
+type ExceptionType = 'Duplicate transaction' | 'Approval proximity' | 'Weekend posting' | 'Unusually large' | 'New vendor risk' | 'Transaction splitting';
 type Transaction = {
   id: string;
   date: string;
@@ -51,6 +51,7 @@ type TriggeredException = {
   details: string;
   related: string[];
   followUp: string;
+  relatedTransactions?: Transaction[];
 };
 type Finding = Transaction & {
   exceptions: TriggeredException[];
@@ -65,6 +66,9 @@ const sampleTransactions: Transaction[] = [
   { id: 'GL-2404', date: '2024-06-07', account: '6400 · Travel', vendor: 'Pine & Rail Travel', amount: 2180, description: 'Client site travel' },
   { id: 'GL-2405', date: '2024-06-08', account: '6300 · Contractors', vendor: 'Morrow Studio LLC', amount: 12850, description: 'Brand system phase two' },
   { id: 'GL-2406', date: '2024-06-10', account: '6000 · Office', vendor: 'Paper Kite Supply', amount: 3760, description: 'Quarterly office supplies' },
+  { id: 'GL-2417', date: '2024-06-03', account: '6000 · Office', vendor: 'Summit Office Interiors', amount: 3200, description: 'Workspace furniture deposit' },
+  { id: 'GL-2418', date: '2024-06-06', account: '6000 · Office', vendor: 'Summit Office Interiors', amount: 3800, description: 'Workspace furniture delivery' },
+  { id: 'GL-2419', date: '2024-06-11', account: '6000 · Office', vendor: 'Summit Office Interiors', amount: 4200, description: 'Workspace furniture installation' },
   { id: 'GL-2407', date: '2024-06-12', account: '6500 · Professional', vendor: 'Harbor Legal Group', amount: 26800, description: 'Contract review and filing' },
   { id: 'GL-2408', date: '2024-06-14', account: '6300 · Contractors', vendor: 'Morrow Studio LLC', amount: 10120, description: 'Brand system phase two' },
   { id: 'GL-2409', date: '2024-06-15', account: '6800 · Events', vendor: 'Lumen House Events', amount: 7200, description: 'Partner roundtable venue' },
@@ -83,6 +87,7 @@ const testDefinitions: { type: ExceptionType; label: string; rule: string; tone:
   { type: 'Weekend posting', label: 'Weekend postings', rule: 'Transaction date is Saturday or Sunday', tone: 'sky' },
   { type: 'Unusually large', label: 'Unusually large transactions', rule: 'Amount is at least $25,000', tone: 'plum' },
   { type: 'New vendor risk', label: 'New vendor risk', rule: 'Vendor appears exactly once in the review period', tone: 'lime' },
+  { type: 'Transaction splitting', label: 'Transaction splitting', rule: '3+ sub-threshold transactions from the same vendor and account total above threshold within 10 days', tone: 'plum' },
 ];
 
 const currency = (value: number) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -102,8 +107,39 @@ const calendarDayDistance = (first: string, second: string) => {
 };
 const riskWeight: Record<Risk, number> = { Low: 1, Medium: 2, High: 3 };
 
+function findSplittingClusters(transactions: Transaction[], threshold: number): Transaction[][] {
+  const groups = new Map<string, Transaction[]>();
+  transactions.forEach((tx) => {
+    const key = `${tx.vendor.trim().toLowerCase()}|${tx.account.trim().toLowerCase()}`;
+    groups.set(key, [...(groups.get(key) ?? []), tx]);
+  });
+
+  const clusters: Transaction[][] = [];
+  groups.forEach((group) => {
+    const ordered = [...group].sort((first, second) => calendarDay(first.date) - calendarDay(second.date) || first.id.localeCompare(second.id));
+    let start = 0;
+    while (start <= ordered.length - 3) {
+      let end = start;
+      while (end + 1 < ordered.length && calendarDayDistance(ordered[start].date, ordered[end + 1].date) <= 10) end += 1;
+      const cluster = ordered.slice(start, end + 1);
+      const total = cluster.reduce((sum, tx) => sum + tx.amount, 0);
+      if (cluster.length >= 3 && cluster.every((tx) => tx.amount < threshold) && total > threshold) {
+        clusters.push(cluster);
+        start = end + 1;
+      } else {
+        start += 1;
+      }
+    }
+  });
+  return clusters;
+}
+
 function analyze(transactions: Transaction[], threshold: number): Finding[] {
   const counts = transactions.reduce<Record<string, number>>((acc, tx) => ({ ...acc, [tx.vendor]: (acc[tx.vendor] ?? 0) + 1 }), {});
+  const splittingClusterById = new Map<string, Transaction[]>();
+  findSplittingClusters(transactions, threshold).forEach((cluster) => {
+    cluster.forEach((tx) => splittingClusterById.set(tx.id, cluster));
+  });
   const result: Finding[] = [];
   transactions.forEach((tx) => {
     const duplicateMatches = transactions.filter((candidate) =>
@@ -114,8 +150,8 @@ function analyze(transactions: Transaction[], threshold: number): Finding[] {
       && calendarDayDistance(candidate.date, tx.date) <= 3,
     );
     const exceptions: TriggeredException[] = [];
-    const add = (type: ExceptionType, risk: Risk, why: string, details: string, related: string[], followUp: string) =>
-      exceptions.push({ type, risk, why, details, related, followUp });
+    const add = (type: ExceptionType, risk: Risk, why: string, details: string, related: string[], followUp: string, relatedTransactions?: Transaction[]) =>
+      exceptions.push({ type, risk, why, details, related, followUp, relatedTransactions });
     if (duplicateMatches.length > 0) {
       const duplicateDetails = duplicateMatches.map((match) => {
         const daysApart = calendarDayDistance(tx.date, match.date);
@@ -133,6 +169,15 @@ function analyze(transactions: Transaction[], threshold: number): Finding[] {
     if (isWeekend(tx.date)) add('Weekend posting', 'Low', 'This transaction was posted on a Saturday or Sunday.', `${dateLabel(tx.date)} falls outside the standard Monday–Friday posting window.`, [], 'Confirm the posting date, supporting document date, and whether a period-end adjustment explains the timing.');
     if (tx.amount >= 25000) add('Unusually large', 'High', 'The amount is materially larger than routine ledger activity.', `${currency(tx.amount)} exceeds the deterministic $25,000 large-transaction marker.`, [], 'Vouch to contract, invoice, receipt, and evidence of service delivery. Confirm authorization.');
     if (counts[tx.vendor] === 1) add('New vendor risk', 'Medium', 'This vendor occurs only once in the supplied review period.', `No second posting for ${tx.vendor} appears in the current dataset, so vendor history cannot be corroborated here.`, [], 'Check vendor onboarding, tax documentation, bank details, and the business purpose before clearing.');
+    const splittingCluster = splittingClusterById.get(tx.id);
+    if (splittingCluster) {
+      const orderedCluster = [...splittingCluster].sort((first, second) => calendarDay(first.date) - calendarDay(second.date) || first.id.localeCompare(second.id));
+      const clusterStart = orderedCluster[0];
+      const clusterEnd = orderedCluster[orderedCluster.length - 1];
+      const clusterTotal = splittingCluster.reduce((sum, clusterTransaction) => sum + clusterTransaction.amount, 0);
+      const clusterDetails = `${splittingCluster.length} transactions totaling ${currency(clusterTotal)} were posted to the same vendor (${tx.vendor}) and account (${tx.account}) within a 10-day window (${dateLabel(clusterStart.date)}–${dateLabel(clusterEnd.date)}), each individually below the ${currency(threshold)} approval threshold. This pattern may indicate an attempt to avoid required approval.`;
+      add('Transaction splitting', 'High', 'A cluster of sub-threshold postings from the same vendor and account exceeds the configured approval threshold in aggregate.', clusterDetails, splittingCluster.filter((clusterTransaction) => clusterTransaction.id !== tx.id).map((clusterTransaction) => clusterTransaction.id), 'Review the purchase order, invoices, receiving evidence, and approval trail together for the full cluster. Confirm whether the postings represent one coordinated purchase.', splittingCluster);
+    }
     if (exceptions.length > 0) {
       const highestRisk = exceptions.reduce<Risk>((highest, exception) =>
         riskWeight[exception.risk] > riskWeight[highest] ? exception.risk : highest, 'Low');
@@ -352,7 +397,7 @@ function ExceptionTag({ type }: { type: ExceptionType }) {
 }
 
 function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () => void }) {
-  return <div className="flex flex-col items-center justify-center px-6 py-16 text-center"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#e9ecda] text-primary"><Search size={21} /></div><h3 className="font-serif text-xl font-bold">{hasFilters ? 'No findings match those filters' : 'No exceptions found'}</h3><p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">{hasFilters ? 'Try a broader search or clear one of the filters to return to the full review queue.' : 'The five deterministic tests found no entries requiring a second look in this ledger.'}</p>{hasFilters && <button onClick={onClear} className="mt-4 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-muted" data-testid="button-clear-filters">Clear filters</button>}</div>;
+  return <div className="flex flex-col items-center justify-center px-6 py-16 text-center"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#e9ecda] text-primary"><Search size={21} /></div><h3 className="font-serif text-xl font-bold">{hasFilters ? 'No findings match those filters' : 'No exceptions found'}</h3><p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">{hasFilters ? 'Try a broader search or clear one of the filters to return to the full review queue.' : 'The six deterministic tests found no entries requiring a second look in this ledger.'}</p>{hasFilters && <button onClick={onClear} className="mt-4 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-muted" data-testid="button-clear-filters">Clear filters</button>}</div>;
 }
 
 function LoadingRows() {
@@ -387,6 +432,18 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
                 <p className="mt-1 text-xs leading-5 text-[#536659]">{exception.why}</p>
                 <div className="mt-3 text-[11px] font-semibold text-foreground">What we saw</div>
                 <p className="mt-1 text-xs leading-5 text-foreground">{exception.details}</p>
+                {exception.relatedTransactions && <div className="mt-3 border-t border-[#dfe5da] pt-3">
+                  <div className="mb-2 text-[11px] font-semibold text-foreground">Cluster transactions</div>
+                  <div className="space-y-1.5">
+                    {exception.relatedTransactions.map((clusterTransaction) => (
+                      <div key={clusterTransaction.id} className="flex items-center justify-between gap-3 rounded border border-[#dfe5da] bg-[#eef2e9] px-2.5 py-2 text-[10px]" data-testid={`splitting-cluster-transaction-${clusterTransaction.id}`}>
+                        <span className="font-mono font-medium text-primary">{clusterTransaction.id}</span>
+                        <span className="text-[#536659]">{dateLabel(clusterTransaction.date)}</span>
+                        <span className="font-mono font-medium">{currency(clusterTransaction.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>}
                 <div className="mt-3 flex gap-2 border-t border-[#dfe5da] pt-3 text-xs leading-5">
                   <Check size={15} className="mt-0.5 shrink-0 text-primary" />
                   <span><span className="font-semibold">Suggested follow-up:</span> {exception.followUp}</span>
