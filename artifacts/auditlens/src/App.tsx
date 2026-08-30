@@ -511,6 +511,7 @@ function App() {
   const [activeNav, setActiveNav] = useState('overview');
   const [selectedId, setSelectedId] = useState<string | null>('GL-2407');
   const [search, setSearch] = useState('');
+  const [sourceSearch, setSourceSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState<'All risks' | Risk>('All risks');
   const [typeFilter, setTypeFilter] = useState<'All tests' | ExceptionType>('All tests');
   const [sortKey, setSortKey] = useState<'risk' | 'amount' | 'date'>('risk');
@@ -522,7 +523,18 @@ function App() {
   const paymentFileInput = useRef<HTMLInputElement>(null);
   const moneyTrailMap = useMemo(() => buildMoneyTrailMap(supportingData), [supportingData]);
   const findings = useMemo(() => analyze(transactions, threshold, moneyTrailMap), [transactions, threshold, moneyTrailMap]);
-  const selected = findings.find((finding) => finding.id === selectedId) ?? findings[0] ?? null;
+  const selected = useMemo(() => {
+    const transaction = transactions.find((candidate) => candidate.id === selectedId) ?? transactions[0];
+    if (!transaction) return null;
+    const finding = findings.find((candidate) => candidate.id === transaction.id);
+    return {
+      ...transaction,
+      exceptions: finding?.exceptions ?? [],
+      risk: finding?.risk ?? 'Low',
+      related: finding?.related ?? [],
+      moneyTrail: moneyTrailMap.get(transaction.id),
+    };
+  }, [findings, moneyTrailMap, selectedId, transactions]);
   const filteredFindings = useMemo(() => {
     const searchTerm = search.toLowerCase();
     return findings.filter((finding) => {
@@ -534,6 +546,10 @@ function App() {
       return sortDescending ? -comparison : comparison;
     });
   }, [findings, riskFilter, search, sortDescending, sortKey, typeFilter]);
+  const filteredTransactions = useMemo(() => {
+    const searchTerm = sourceSearch.trim().toLowerCase();
+    return transactions.filter((transaction) => !searchTerm || [transaction.id, transaction.vendor, transaction.account].some((value) => value.toLowerCase().includes(searchTerm)));
+  }, [sourceSearch, transactions]);
   const flaggedDollars = findings.reduce((sum, finding) => sum + finding.amount, 0);
   const riskCounts = findings.reduce<Record<Risk, number>>((acc, finding) => ({ ...acc, [finding.risk]: (acc[finding.risk] ?? 0) + 1 }), { High: 0, Medium: 0, Low: 0 });
 
@@ -604,6 +620,10 @@ function App() {
     reader.readAsText(file);
     event.target.value = '';
   };
+  const selectTransaction = (id: string) => {
+    setSelectedId(id);
+    window.setTimeout(() => document.getElementById('investigation-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
   const exportFindings = () => {
     const header = 'Transaction ID,Date,Account,Vendor,Amount,Exception Type,Risk\n';
     const body = findings.map((finding) => [finding.id, finding.date, finding.account, finding.vendor, finding.amount, finding.exceptions.map((exception) => exception.type).join('; '), finding.risk].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -637,7 +657,7 @@ function App() {
           <nav className="space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              return <button key={item.id} onClick={() => { setActiveNav(item.id); setMobileNav(false); if (item.id === 'overview') window.scrollTo({ top: 0, behavior: 'smooth' }); if (item.id === 'exceptions') document.getElementById('exceptions-section')?.scrollIntoView({ behavior: 'smooth' }); if (item.id === 'data') document.getElementById('source-section')?.scrollIntoView({ behavior: 'smooth' }); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${activeNav === item.id ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'}`} data-testid={`button-nav-${item.id}`}><span className="flex items-center gap-3"><Icon size={16} /><span>{item.label}</span></span>{item.count !== undefined && <span className="font-mono text-[10px] text-sidebar-foreground/45">{item.count}</span>}</button>;
+               return <button key={item.id} onClick={() => { setActiveNav(item.id); setMobileNav(false); if (item.id === 'overview') window.scrollTo({ top: 0, behavior: 'smooth' }); if (item.id === 'exceptions') document.getElementById('exceptions-section')?.scrollIntoView({ behavior: 'smooth' }); if (item.id === 'data') document.getElementById('source-section')?.scrollIntoView({ behavior: 'smooth' }); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${activeNav === item.id ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'}`} data-testid={`button-nav-${item.id}`}><span className="flex items-center gap-3"><Icon size={16} /><span>{item.label}</span></span>{item.count !== undefined && <span className="font-mono text-[10px] text-sidebar-foreground/45">{item.count}</span>}</button>;
             })}
           </nav>
         </div>
@@ -662,7 +682,7 @@ function App() {
             <div className="flex shrink-0 items-center gap-2"><button onClick={useSample} className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3.5 py-2.5 text-xs font-semibold shadow-sm transition hover:-translate-y-px hover:border-primary/40" data-testid="button-use-sample"><RotateCcw size={14} /> Reset to sample</button><button onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:brightness-105" data-testid="button-upload-csv"><Upload size={14} /> Upload CSV</button></div>
           </section>
 
-          <section id="source-section" className="audit-rise audit-delay-1 mb-8 grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
+           <section id="supporting-files-section" className="audit-rise audit-delay-1 mb-8 grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
             <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
               <div className="absolute right-0 top-0 h-full w-1/3 opacity-60" style={{ background: 'radial-gradient(circle at 70% 30%, hsl(67 66% 63% / .22), transparent 60%)' }} />
               <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div><div className="mb-2 flex items-center gap-2"><FileCheck2 size={17} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Source ledger</span></div><div className="flex flex-wrap items-center gap-3"><h2 className="text-base font-semibold">{fileName}</h2><span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Loaded</span></div><p className="mt-2 text-xs text-muted-foreground">{transactions.length} rows · fictional data · ready for local analysis</p></div><button onClick={() => fileInput.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-muted" data-testid="button-replace-csv"><Upload size={14} /> Replace file</button></div>
@@ -696,11 +716,13 @@ function App() {
             <Metric label="Flagged dollars" value={compactCurrency(flaggedDollars)} detail="unique entries" icon={BarChart3} accent="lime" />
           </section>
 
+           <SourceDataSection transactions={transactions} filteredTransactions={filteredTransactions} findings={findings} search={sourceSearch} selectedId={selectedId} onSearch={setSourceSearch} onSelect={selectTransaction} />
+
           <section id="exceptions-section" className="audit-rise audit-delay-3 mb-10">
              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><div className="mb-1 font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">01 / Exception register</div><h2 className="font-serif text-2xl font-bold tracking-[-.03em]">Review queue</h2></div><div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[#d7a72f]" /> {filteredFindings.length} of {findings.length} entries shown</div></div>
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between"><div className="relative max-w-[330px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" placeholder="Search ID, vendor, account..." value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-xs outline-none ring-primary/20 transition placeholder:text-muted-foreground/70 focus:ring-2" data-testid="input-search-exceptions" /></div><div className="flex flex-wrap items-center gap-2"><Filter size={14} className="text-muted-foreground" /><select value={riskFilter} onChange={(event) => setRiskFilter(event.target.value as typeof riskFilter)} className="rounded-md border border-border bg-background px-2.5 py-2 text-xs outline-none" data-testid="select-risk-filter"><option>All risks</option><option>High</option><option>Medium</option><option>Low</option></select><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)} className="max-w-[190px] rounded-md border border-border bg-background px-2.5 py-2 text-xs outline-none" data-testid="select-type-filter"><option>All tests</option>{testDefinitions.map((test) => <option key={test.type}>{test.type}</option>)}</select><button onClick={() => { setSortKey(sortKey === 'risk' ? 'amount' : sortKey === 'amount' ? 'date' : 'risk'); setSortDescending(!sortDescending); }} className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-2 text-xs font-medium hover:bg-muted" data-testid="button-sort-exceptions"><ArrowUpDown size={14} /> Sort</button></div></div>
-               {isAnalyzing ? <LoadingRows /> : filteredFindings.length === 0 ? <EmptyState hasFilters={Boolean(search || riskFilter !== 'All risks' || typeFilter !== 'All tests')} onClear={() => { setSearch(''); setRiskFilter('All risks'); setTypeFilter('All tests'); }} /> : <div className="audit-scrollbar overflow-x-auto"><table className="w-full min-w-[800px] border-collapse text-left"><thead><tr className="border-b border-border bg-[#f1f0e9] font-mono text-[9px] uppercase tracking-[.12em] text-muted-foreground"><th className="px-4 py-3 font-medium">Transaction</th><th className="px-4 py-3 font-medium">Posted</th><th className="px-4 py-3 font-medium">Account / vendor</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Exception type</th><th className="px-4 py-3 font-medium">Risk</th><th className="w-10 px-4 py-3" /></tr></thead><tbody>{filteredFindings.map((finding, index) => <tr key={finding.id} onClick={() => setSelectedId(finding.id)} className={`cursor-pointer border-b border-border/70 transition-colors last:border-0 hover:bg-[#f6f6ed] ${selected?.id === finding.id ? 'bg-[#eef0df]' : ''}`} data-testid={`row-exception-${finding.id}-${index}`}><td className="px-4 py-3.5"><div className="font-mono text-xs font-medium text-primary">{finding.id}</div><div className="mt-1 max-w-[150px] truncate text-[11px] text-muted-foreground">{finding.description}</div></td><td className="px-4 py-3.5"><div className="text-xs">{dateLabel(finding.date)}</div><div className="mt-1 font-mono text-[9px] uppercase text-muted-foreground">{isWeekend(finding.date) ? 'Weekend' : 'Weekday'}</div></td><td className="px-4 py-3.5"><div className="text-xs font-medium">{finding.account}</div><div className="mt-1 text-[11px] text-muted-foreground">{finding.vendor}</div></td><td className="px-4 py-3.5 text-right font-mono text-xs font-medium">{currency(finding.amount)}</td><td className="px-4 py-3.5"><div className="flex max-w-[240px] flex-wrap gap-1.5">{finding.exceptions.map((exception) => <ExceptionTag key={exception.type} type={exception.type} />)}</div></td><td className="px-4 py-3.5"><RiskBadge risk={finding.risk} /></td><td className="px-4 py-3.5 text-muted-foreground"><ChevronDown size={15} className="-rotate-90" /></td></tr>)}</tbody></table></div>}
+               {isAnalyzing ? <LoadingRows /> : filteredFindings.length === 0 ? <EmptyState hasFilters={Boolean(search || riskFilter !== 'All risks' || typeFilter !== 'All tests')} onClear={() => { setSearch(''); setRiskFilter('All risks'); setTypeFilter('All tests'); }} /> : <div className="audit-scrollbar overflow-x-auto"><table className="w-full min-w-[800px] border-collapse text-left"><thead><tr className="border-b border-border bg-[#f1f0e9] font-mono text-[9px] uppercase tracking-[.12em] text-muted-foreground"><th className="px-4 py-3 font-medium">Transaction</th><th className="px-4 py-3 font-medium">Posted</th><th className="px-4 py-3 font-medium">Account / vendor</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Exception type</th><th className="px-4 py-3 font-medium">Risk</th><th className="w-10 px-4 py-3" /></tr></thead><tbody>{filteredFindings.map((finding, index) => <tr key={finding.id} onClick={() => selectTransaction(finding.id)} className={`cursor-pointer border-b border-border/70 transition-colors last:border-0 hover:bg-[#f6f6ed] ${selected?.id === finding.id ? 'bg-[#eef0df]' : ''}`} data-testid={`row-exception-${finding.id}-${index}`}><td className="px-4 py-3.5"><div className="font-mono text-xs font-medium text-primary">{finding.id}</div><div className="mt-1 max-w-[150px] truncate text-[11px] text-muted-foreground">{finding.description}</div></td><td className="px-4 py-3.5"><div className="text-xs">{dateLabel(finding.date)}</div><div className="mt-1 font-mono text-[9px] uppercase text-muted-foreground">{isWeekend(finding.date) ? 'Weekend' : 'Weekday'}</div></td><td className="px-4 py-3.5"><div className="text-xs font-medium">{finding.account}</div><div className="mt-1 text-[11px] text-muted-foreground">{finding.vendor}</div></td><td className="px-4 py-3.5 text-right font-mono text-xs font-medium">{currency(finding.amount)}</td><td className="px-4 py-3.5"><div className="flex max-w-[240px] flex-wrap gap-1.5">{finding.exceptions.map((exception) => <ExceptionTag key={exception.type} type={exception.type} />)}</div></td><td className="px-4 py-3.5"><RiskBadge risk={finding.risk} /></td><td className="px-4 py-3.5 text-muted-foreground"><ChevronDown size={15} className="-rotate-90" /></td></tr>)}</tbody></table></div>}
             </div>
           </section>
 
@@ -718,6 +740,36 @@ function App() {
 function Metric({ label, value, detail, icon: Icon, accent = 'teal' }: { label: string; value: string; detail: string; icon: typeof FileText; accent?: string }) {
   const colors: Record<string, string> = { teal: 'text-primary bg-[#dcece7]', rose: 'text-[#9a4b3d] bg-[#f8dfd9]', red: 'text-[#a23b31] bg-[#f8dfd9]', amber: 'text-[#98731e] bg-[#faedc7]', lime: 'text-[#55723e] bg-[#e5efd4]' };
   return <div className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5"><div className={`mb-5 flex h-8 w-8 items-center justify-center rounded-md ${colors[accent]}`}>{<Icon size={16} />}</div><div className="font-mono text-2xl tracking-[-.04em] text-foreground sm:text-[27px]" data-testid={`metric-value-${label.toLowerCase().replace(/\s/g, '-')}`}>{value}</div><div className="mt-1 text-xs font-semibold">{label}</div><div className="mt-1 text-[10px] text-muted-foreground">{detail}</div></div>;
+}
+
+function SourceDataSection({ transactions, filteredTransactions, findings, search, selectedId, onSearch, onSelect }: { transactions: Transaction[]; filteredTransactions: Transaction[]; findings: Finding[]; search: string; selectedId: string | null; onSearch: (value: string) => void; onSelect: (id: string) => void }) {
+  const findingsById = new Map(findings.map((finding) => [finding.id, finding]));
+  return (
+    <section id="source-section" className="audit-rise audit-delay-3 mb-10">
+      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+        <div><div className="mb-1 font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">01 / Source data</div><h2 className="font-serif text-2xl font-bold tracking-[-.03em]">Every ledger transaction</h2></div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-[#78a18e]" /> {filteredTransactions.length.toLocaleString()} of {transactions.length.toLocaleString()} transactions shown</div>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative max-w-[380px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input type="search" placeholder="Search transaction ID, vendor, account..." value={search} onChange={(event) => onSearch(event.target.value)} className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-xs outline-none ring-primary/20 transition placeholder:text-muted-foreground/70 focus:ring-2" data-testid="input-search-source-data" /></div>
+          <div className="font-mono text-[10px] uppercase tracking-[.1em] text-muted-foreground">Click any row to investigate</div>
+        </div>
+        {filteredTransactions.length === 0 ? <div className="px-6 py-14 text-center"><div className="font-serif text-xl font-bold">No transactions match</div><p className="mt-2 text-xs text-muted-foreground">Search by transaction ID, vendor, or account.</p></div> : <div className="audit-scrollbar max-h-[680px] overflow-auto"><table className="w-full min-w-[850px] border-collapse text-left" data-testid="table-source-data"><thead className="sticky top-0 z-[1]"><tr className="border-b border-border bg-[#f1f0e9] font-mono text-[9px] uppercase tracking-[.12em] text-muted-foreground"><th className="px-4 py-3 font-medium">Transaction</th><th className="px-4 py-3 font-medium">Posted</th><th className="px-4 py-3 font-medium">Account</th><th className="px-4 py-3 font-medium">Vendor</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Test status</th><th className="px-4 py-3 font-medium">Risk</th></tr></thead><tbody>{filteredTransactions.map((transaction, index) => {
+          const finding = findingsById.get(transaction.id);
+          return <tr key={transaction.id} tabIndex={0} onClick={() => onSelect(transaction.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(transaction.id); } }} className={`cursor-pointer border-b border-border/70 transition-colors last:border-0 hover:bg-[#f6f6ed] focus:bg-[#eef0df] focus:outline-none ${selectedId === transaction.id ? 'bg-[#eef0df]' : ''}`} data-testid={`row-source-data-${transaction.id}-${index}`}>
+            <td className="px-4 py-3"><div className="font-mono text-xs font-medium text-primary">{transaction.id}</div><div className="mt-1 max-w-[180px] truncate text-[11px] text-muted-foreground">{transaction.description}</div></td>
+            <td className="px-4 py-3"><div className="text-xs">{dateLabel(transaction.date)}</div><div className="mt-1 font-mono text-[9px] uppercase text-muted-foreground">{isWeekend(transaction.date) ? 'Weekend' : 'Weekday'}</div></td>
+            <td className="px-4 py-3 text-xs">{transaction.account}</td>
+            <td className="px-4 py-3 text-xs">{transaction.vendor}</td>
+            <td className="px-4 py-3 text-right font-mono text-xs font-medium">{currency(transaction.amount)}</td>
+            <td className="px-4 py-3"><div className="flex max-w-[270px] flex-wrap gap-1.5">{finding?.exceptions.length ? finding.exceptions.map((exception) => <ExceptionTag key={exception.type} type={exception.type} />) : <span className="text-[10px] text-muted-foreground">Not flagged</span>}</div></td>
+            <td className="px-4 py-3">{finding ? <RiskBadge risk={finding.risk} /> : <span className="font-mono text-[9px] uppercase tracking-[.08em] text-muted-foreground">Unflagged</span>}</td>
+          </tr>;
+        })}</tbody></table></div>}
+      </div>
+    </section>
+  );
 }
 
 function RiskBadge({ risk }: { risk: Risk }) {
@@ -749,14 +801,14 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
         </div>
         <RiskBadge risk={finding.risk} />
       </div>
-      <div className="py-5">
-        <div className="font-serif text-[22px] font-bold leading-tight tracking-[-.03em]">{finding.exceptions.length} {finding.exceptions.length === 1 ? 'test' : 'tests'} triggered</div>
-        <p className="mt-2 text-xs leading-5 text-[#536659]">Review each test below. The displayed risk is the highest level triggered by this transaction.</p>
-      </div>
+       <div className="py-5">
+         <div className="font-serif text-[22px] font-bold leading-tight tracking-[-.03em]">{finding.exceptions.length ? `${finding.exceptions.length} ${finding.exceptions.length === 1 ? 'test' : 'tests'} triggered` : 'No automated tests triggered'}</div>
+         <p className="mt-2 text-xs leading-5 text-[#536659]">{finding.exceptions.length ? 'Review each test below. The displayed risk is the highest level triggered by this transaction.' : 'This transaction is available for direct review even though it did not match an automated exception rule.'}</p>
+       </div>
       <div className="space-y-4">
         <InvestigationBlock label="Tests triggered">
-          <div className="space-y-3">
-            {finding.exceptions.map((exception) => (
+           {finding.exceptions.length ? <div className="space-y-3">
+             {finding.exceptions.map((exception) => (
               <div key={exception.type} className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-3" data-testid={`detail-exception-${finding.id}-${exception.type.toLowerCase().replace(/\s/g, '-')}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <ExceptionTag type={exception.type} />
@@ -783,8 +835,8 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
                   <span><span className="font-semibold">Suggested follow-up:</span> {exception.followUp}</span>
                 </div>
               </div>
-            ))}
-          </div>
+             ))}
+           </div> : <div className="rounded-md border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-3 text-xs leading-5 text-[#536659]">No exception tests matched this transaction in the current review.</div>}
         </InvestigationBlock>
         <InvestigationBlock label="Transaction">
           <div className="grid grid-cols-2 gap-y-3 rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-3">
