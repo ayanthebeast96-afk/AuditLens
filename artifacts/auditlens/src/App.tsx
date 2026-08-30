@@ -58,6 +58,12 @@ type Finding = Transaction & {
   risk: Risk;
   related: string[];
 };
+type AccountStatistics = {
+  mean: number;
+  standardDeviation: number;
+  min: number;
+  max: number;
+};
 
 const sampleTransactions: Transaction[] = [
   { id: 'GL-2401', date: '2024-06-03', account: '6100 · Facilities', vendor: 'Northstar Facilities', amount: 8420, description: 'June building services' },
@@ -85,7 +91,7 @@ const testDefinitions: { type: ExceptionType; label: string; rule: string; tone:
   { type: 'Duplicate transaction', label: 'Duplicate transactions', rule: 'Same vendor and account, amount within $1, posted within 3 days', tone: 'rose' },
   { type: 'Approval proximity', label: 'Approval threshold proximity', rule: 'Amount falls within 5% below approval threshold', tone: 'amber' },
   { type: 'Weekend posting', label: 'Weekend postings', rule: 'Transaction date is Saturday or Sunday', tone: 'sky' },
-  { type: 'Unusually large', label: 'Unusually large transactions', rule: 'Amount is at least $25,000', tone: 'plum' },
+  { type: 'Unusually large', label: 'Unusually large transactions', rule: 'Amount is more than 3 standard deviations above the mean for its own account', tone: 'plum' },
   { type: 'New vendor risk', label: 'New vendor risk', rule: 'Vendor appears exactly once in the review period', tone: 'lime' },
   { type: 'Transaction splitting', label: 'Transaction splitting', rule: '3+ sub-threshold transactions from the same vendor and account total above threshold within 10 days', tone: 'plum' },
 ];
@@ -106,6 +112,25 @@ const calendarDayDistance = (first: string, second: string) => {
     : Number.POSITIVE_INFINITY;
 };
 const riskWeight: Record<Risk, number> = { Low: 1, Medium: 2, High: 3 };
+
+function getAccountStatistics(transactions: Transaction[]): Map<string, AccountStatistics> {
+  const amountsByAccount = new Map<string, number[]>();
+  transactions.forEach((tx) => {
+    const key = tx.account.trim().toLowerCase();
+    amountsByAccount.set(key, [...(amountsByAccount.get(key) ?? []), tx.amount]);
+  });
+
+  return new Map(Array.from(amountsByAccount.entries()).map(([account, amounts]) => {
+    const mean = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
+    const variance = amounts.reduce((sum, amount) => sum + (amount - mean) ** 2, 0) / amounts.length;
+    return [account, {
+      mean,
+      standardDeviation: Math.sqrt(variance),
+      min: Math.min(...amounts),
+      max: Math.max(...amounts),
+    }];
+  }));
+}
 
 function findSplittingClusters(transactions: Transaction[], threshold: number): Transaction[][] {
   const groups = new Map<string, Transaction[]>();
@@ -136,6 +161,7 @@ function findSplittingClusters(transactions: Transaction[], threshold: number): 
 
 function analyze(transactions: Transaction[], threshold: number): Finding[] {
   const counts = transactions.reduce<Record<string, number>>((acc, tx) => ({ ...acc, [tx.vendor]: (acc[tx.vendor] ?? 0) + 1 }), {});
+  const accountStatistics = getAccountStatistics(transactions);
   const splittingClusterById = new Map<string, Transaction[]>();
   findSplittingClusters(transactions, threshold).forEach((cluster) => {
     cluster.forEach((tx) => splittingClusterById.set(tx.id, cluster));
@@ -167,7 +193,18 @@ function analyze(transactions: Transaction[], threshold: number): Finding[] {
     }
     if (tx.amount >= threshold * 0.95 && tx.amount < threshold) add('Approval proximity', 'Medium', `The amount is ${currency(threshold - tx.amount)} below the configured approval threshold.`, `${currency(tx.amount)} is within the 5% proximity band below ${currency(threshold)}.`, [], 'Inspect the approval matrix and confirm the spend was reviewed at the appropriate level.');
     if (isWeekend(tx.date)) add('Weekend posting', 'Low', 'This transaction was posted on a Saturday or Sunday.', `${dateLabel(tx.date)} falls outside the standard Monday–Friday posting window.`, [], 'Confirm the posting date, supporting document date, and whether a period-end adjustment explains the timing.');
-    if (tx.amount >= 25000) add('Unusually large', 'High', 'The amount is materially larger than routine ledger activity.', `${currency(tx.amount)} exceeds the deterministic $25,000 large-transaction marker.`, [], 'Vouch to contract, invoice, receipt, and evidence of service delivery. Confirm authorization.');
+    const accountStats = accountStatistics.get(tx.account.trim().toLowerCase());
+    if (accountStats && accountStats.standardDeviation > 0 && tx.amount > accountStats.mean + 3 * accountStats.standardDeviation) {
+      const standardDeviationsAboveMean = (tx.amount - accountStats.mean) / accountStats.standardDeviation;
+      add(
+        'Unusually large',
+        'High',
+        `This transaction is ${currency(tx.amount)}. The typical range for ${tx.account} transactions is ${currency(accountStats.min)}–${currency(accountStats.max)} (average ${currency(accountStats.mean)}). This transaction is approximately ${standardDeviationsAboveMean.toFixed(1)} standard deviations above normal for this account.`,
+        `The account mean is ${currency(accountStats.mean)} with a population standard deviation of ${currency(accountStats.standardDeviation)}. The 3-standard-deviation review point is ${currency(accountStats.mean + 3 * accountStats.standardDeviation)}, and this transaction is above it.`,
+        [],
+        'Vouch to contract, invoice, receipt, and evidence of service delivery. Confirm authorization.',
+      );
+    }
     if (counts[tx.vendor] === 1) add('New vendor risk', 'Medium', 'This vendor occurs only once in the supplied review period.', `No second posting for ${tx.vendor} appears in the current dataset, so vendor history cannot be corroborated here.`, [], 'Check vendor onboarding, tax documentation, bank details, and the business purpose before clearing.');
     const splittingCluster = splittingClusterById.get(tx.id);
     if (splittingCluster) {
