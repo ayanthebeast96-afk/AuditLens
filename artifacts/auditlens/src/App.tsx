@@ -33,6 +33,9 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import vendorMasterCsv from '@assets/vendor_master_1788078370267.csv?raw';
+import invoicesCsv from '@assets/invoices_1788078370267.csv?raw';
+import paymentsCsv from '@assets/payments_1788078370266.csv?raw';
 
 type Risk = 'High' | 'Medium' | 'Low';
 type ExceptionType = 'Duplicate transaction' | 'Approval proximity' | 'Weekend posting' | 'Unusually large' | 'New vendor risk' | 'Transaction splitting';
@@ -43,6 +46,47 @@ type Transaction = {
   vendor: string;
   amount: number;
   description: string;
+};
+type VendorRecord = {
+  vendorId: string;
+  vendorName: string;
+  createdDate: string;
+  primaryAccount: string;
+  bankAccountRef: string;
+  status: string;
+};
+type InvoiceRecord = {
+  invoiceId: string;
+  invoiceNumber: string;
+  vendorId: string;
+  glTransactionId: string;
+  invoiceDate: string;
+  amount: number;
+};
+type PaymentRecord = {
+  paymentId: string;
+  invoiceId: string;
+  paymentDate: string;
+  amount: number;
+  bankAccountRef: string;
+};
+type MoneyTrailFlag = {
+  message: string;
+  detail?: string;
+};
+type MoneyTrail = {
+  invoice?: InvoiceRecord;
+  vendor?: VendorRecord;
+  payment?: PaymentRecord;
+  flags: MoneyTrailFlag[];
+};
+type SupportingData = {
+  vendors: VendorRecord[];
+  invoices: InvoiceRecord[];
+  payments: PaymentRecord[];
+  vendorFileName: string;
+  invoiceFileName: string;
+  paymentFileName: string;
 };
 type TriggeredException = {
   type: ExceptionType;
@@ -57,6 +101,7 @@ type Finding = Transaction & {
   exceptions: TriggeredException[];
   risk: Risk;
   related: string[];
+  moneyTrail?: MoneyTrail;
 };
 type AccountStatistics = {
   mean: number;
@@ -159,7 +204,7 @@ function findSplittingClusters(transactions: Transaction[], threshold: number): 
   return clusters;
 }
 
-function analyze(transactions: Transaction[], threshold: number): Finding[] {
+function analyze(transactions: Transaction[], threshold: number, moneyTrailMap: Map<string, MoneyTrail>): Finding[] {
   const counts = transactions.reduce<Record<string, number>>((acc, tx) => ({ ...acc, [tx.vendor]: (acc[tx.vendor] ?? 0) + 1 }), {});
   const accountStatistics = getAccountStatistics(transactions);
   const splittingClusterById = new Map<string, Transaction[]>();
@@ -223,6 +268,7 @@ function analyze(transactions: Transaction[], threshold: number): Finding[] {
         exceptions,
         risk: highestRisk,
         related: Array.from(new Set(exceptions.flatMap((exception) => exception.related))),
+        moneyTrail: moneyTrailMap.get(tx.id),
       });
     }
   });
@@ -265,6 +311,194 @@ function parseCsv(text: string): { rows: Transaction[]; error?: string } {
   return { rows, error: rows.length > 5000 ? 'This portfolio view supports up to 5,000 rows at a time.' : undefined };
 }
 
+type SupportingFileKind = 'vendor' | 'invoice' | 'payment';
+type CsvTable = { headers: string[]; rows: string[][]; error?: string };
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === '"' && line[index + 1] === '"' && quoted) { cell += '"'; index += 1; }
+    else if (character === '"') quoted = !quoted;
+    else if (character === ',' && !quoted) { cells.push(cell.trim()); cell = ''; }
+    else cell += character;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function parseCsvTable(text: string): CsvTable {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) return { headers: [], rows: [], error: 'The file needs a header row and at least one data row.' };
+  return {
+    headers: parseCsvLine(lines[0]).map((item) => item.toLowerCase().replace(/[\s-]+/g, '_')),
+    rows: lines.slice(1).map(parseCsvLine),
+  };
+}
+
+function parseVendorMasterCsv(text: string): { rows: VendorRecord[]; error?: string } {
+  const table = parseCsvTable(text);
+  if (table.error) return { rows: [], error: table.error };
+  const find = (name: string) => table.headers.indexOf(name);
+  const indexes = {
+    vendorId: find('vendor_id'),
+    vendorName: find('vendor_name'),
+    createdDate: find('created_date'),
+    primaryAccount: find('primary_account'),
+    bankAccountRef: find('bank_account_ref'),
+    status: find('status'),
+  };
+  if (Object.values(indexes).some((index) => index === -1)) return { rows: [], error: 'Vendor master is missing one of: vendor_id, vendor_name, created_date, primary_account, bank_account_ref, status.' };
+  const rows: VendorRecord[] = [];
+  for (let index = 0; index < table.rows.length; index += 1) {
+    const cells = table.rows[index];
+    const values = Object.fromEntries(Object.entries(indexes).map(([key, column]) => [key, cells[column] ?? '']));
+    if (Object.values(values).some((value) => !value)) return { rows: [], error: `Vendor master row ${index + 2} is missing a required value.` };
+    rows.push({
+      vendorId: values.vendorId,
+      vendorName: values.vendorName,
+      createdDate: values.createdDate,
+      primaryAccount: values.primaryAccount,
+      bankAccountRef: values.bankAccountRef,
+      status: values.status,
+    });
+  }
+  return { rows };
+}
+
+function parseInvoicesCsv(text: string): { rows: InvoiceRecord[]; error?: string } {
+  const table = parseCsvTable(text);
+  if (table.error) return { rows: [], error: table.error };
+  const find = (name: string) => table.headers.indexOf(name);
+  const indexes = {
+    invoiceId: find('invoice_id'),
+    invoiceNumber: find('invoice_number'),
+    vendorId: find('vendor_id'),
+    glTransactionId: find('gl_transaction_id'),
+    invoiceDate: find('invoice_date'),
+    amount: find('amount'),
+  };
+  if (Object.values(indexes).some((index) => index === -1)) return { rows: [], error: 'Invoices is missing one of: invoice_id, invoice_number, vendor_id, gl_transaction_id, invoice_date, amount.' };
+  const rows: InvoiceRecord[] = [];
+  for (let index = 0; index < table.rows.length; index += 1) {
+    const cells = table.rows[index];
+    const values = Object.fromEntries(Object.entries(indexes).map(([key, column]) => [key, cells[column] ?? '']));
+    const amount = Number(values.amount.replace(/[$,]/g, ''));
+    if (!values.invoiceId || !values.invoiceNumber || !values.vendorId || !values.glTransactionId || !values.invoiceDate || !Number.isFinite(amount)) return { rows: [], error: `Invoices row ${index + 2} is missing a required value or valid amount.` };
+    rows.push({
+      invoiceId: values.invoiceId,
+      invoiceNumber: values.invoiceNumber,
+      vendorId: values.vendorId,
+      glTransactionId: values.glTransactionId,
+      invoiceDate: values.invoiceDate,
+      amount,
+    });
+  }
+  return { rows };
+}
+
+function parsePaymentsCsv(text: string): { rows: PaymentRecord[]; error?: string } {
+  const table = parseCsvTable(text);
+  if (table.error) return { rows: [], error: table.error };
+  const find = (name: string) => table.headers.indexOf(name);
+  const indexes = {
+    paymentId: find('payment_id'),
+    invoiceId: find('invoice_id'),
+    paymentDate: find('payment_date'),
+    amount: find('amount'),
+    bankAccountRef: find('bank_account_ref'),
+  };
+  if (Object.values(indexes).some((index) => index === -1)) return { rows: [], error: 'Payments is missing one of: payment_id, invoice_id, payment_date, amount, bank_account_ref.' };
+  const rows: PaymentRecord[] = [];
+  for (let index = 0; index < table.rows.length; index += 1) {
+    const cells = table.rows[index];
+    const values = Object.fromEntries(Object.entries(indexes).map(([key, column]) => [key, cells[column] ?? '']));
+    const amount = Number(values.amount.replace(/[$,]/g, ''));
+    if (!values.paymentId || !values.invoiceId || !values.paymentDate || !Number.isFinite(amount) || !values.bankAccountRef) return { rows: [], error: `Payments row ${index + 2} is missing a required value or valid amount.` };
+    rows.push({
+      paymentId: values.paymentId,
+      invoiceId: values.invoiceId,
+      paymentDate: values.paymentDate,
+      amount,
+      bankAccountRef: values.bankAccountRef,
+    });
+  }
+  return { rows };
+}
+
+function invoiceNumberParts(value: string): { prefix: string; number: number } | null {
+  const match = value.trim().match(/^(.*?)(\d+)$/);
+  return match ? { prefix: match[1], number: Number(match[2]) } : null;
+}
+
+function breaksInvoiceNumberPattern(invoice: InvoiceRecord, vendorInvoices: InvoiceRecord[]): boolean {
+  if (vendorInvoices.length < 3) return false;
+  const ordered = [...vendorInvoices].sort((first, second) => calendarDay(first.invoiceDate) - calendarDay(second.invoiceDate) || first.invoiceId.localeCompare(second.invoiceId));
+  const currentIndex = ordered.findIndex((candidate) => candidate.invoiceId === invoice.invoiceId);
+  const parsed = ordered.map((candidate) => invoiceNumberParts(candidate.invoiceNumber));
+  const deltas = parsed.slice(1).flatMap((current, index) => {
+    const previous = parsed[index];
+    return current && previous && current.prefix === previous.prefix && current.number > previous.number ? [current.number - previous.number] : [];
+  });
+  if (currentIndex === -1 || deltas.length < 2) return false;
+  const frequency = new Map<number, number>();
+  deltas.forEach((delta) => frequency.set(delta, (frequency.get(delta) ?? 0) + 1));
+  const typicalStep = [...frequency.entries()].sort((first, second) => second[1] - first[1] || first[0] - second[0])[0][0];
+  const currentParts = parsed[currentIndex];
+  if (!currentParts) return false;
+  const adjacentDeltas: number[] = [];
+  if (currentIndex > 0) {
+    const previous = parsed[currentIndex - 1];
+    if (!previous || previous.prefix !== currentParts.prefix) return false;
+    adjacentDeltas.push(currentParts.number - previous.number);
+  }
+  if (currentIndex < parsed.length - 1) {
+    const next = parsed[currentIndex + 1];
+    if (!next || next.prefix !== currentParts.prefix) return false;
+    adjacentDeltas.push(next.number - currentParts.number);
+  }
+  return adjacentDeltas.some((delta) => delta !== typicalStep);
+}
+
+function buildMoneyTrailMap(data: SupportingData): Map<string, MoneyTrail> {
+  const vendorsById = new Map(data.vendors.map((vendor) => [vendor.vendorId, vendor]));
+  const paymentsByInvoiceId = new Map(data.payments.map((payment) => [payment.invoiceId, payment]));
+  const invoicesByVendorId = new Map<string, InvoiceRecord[]>();
+  const vendorsByBankAccount = new Map<string, VendorRecord[]>();
+  data.invoices.forEach((invoice) => invoicesByVendorId.set(invoice.vendorId, [...(invoicesByVendorId.get(invoice.vendorId) ?? []), invoice]));
+  data.vendors.forEach((vendor) => {
+    const key = vendor.bankAccountRef.trim().toLowerCase();
+    if (key) vendorsByBankAccount.set(key, [...(vendorsByBankAccount.get(key) ?? []), vendor]);
+  });
+
+  return new Map(data.invoices.map((invoice) => {
+    const vendor = vendorsById.get(invoice.vendorId);
+    const payment = paymentsByInvoiceId.get(invoice.invoiceId);
+    const flags: MoneyTrailFlag[] = [];
+    if (vendor && calendarDay(vendor.createdDate) <= calendarDay(invoice.invoiceDate) && calendarDayDistance(vendor.createdDate, invoice.invoiceDate) <= 14) {
+      flags.push({ message: 'Vendor was created shortly before this transaction.' });
+    }
+    if (vendor) {
+      const matchingVendors = (vendorsByBankAccount.get(vendor.bankAccountRef.trim().toLowerCase()) ?? []).filter((candidate) => candidate.vendorId !== vendor.vendorId);
+      if (matchingVendors.length > 0) flags.push({ message: `This vendor's banking information matches another vendor: ${matchingVendors.map((candidate) => candidate.vendorName).join(', ')}.` });
+      const vendorInvoices = invoicesByVendorId.get(vendor.vendorId) ?? [];
+      if (breaksInvoiceNumberPattern(invoice, vendorInvoices)) flags.push({ message: "This invoice number breaks the vendor's normal numbering pattern." });
+    }
+    return [invoice.glTransactionId, { invoice, vendor, payment, flags }];
+  }));
+}
+
+const initialSupportingData: SupportingData = {
+  vendors: parseVendorMasterCsv(vendorMasterCsv).rows,
+  invoices: parseInvoicesCsv(invoicesCsv).rows,
+  payments: parsePaymentsCsv(paymentsCsv).rows,
+  vendorFileName: 'vendor_master.csv',
+  invoiceFileName: 'invoices.csv',
+  paymentFileName: 'payments.csv',
+};
+
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactions);
   const [threshold, setThreshold] = useState(10000);
@@ -272,6 +506,8 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [fileName, setFileName] = useState('fictional_q2_general_ledger.csv');
   const [uploadError, setUploadError] = useState('');
+  const [supportingData, setSupportingData] = useState<SupportingData>(initialSupportingData);
+  const [supportingFileError, setSupportingFileError] = useState('');
   const [activeNav, setActiveNav] = useState('overview');
   const [selectedId, setSelectedId] = useState<string | null>('GL-2407');
   const [search, setSearch] = useState('');
@@ -281,7 +517,11 @@ function App() {
   const [sortDescending, setSortDescending] = useState(true);
   const [mobileNav, setMobileNav] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const findings = useMemo(() => analyze(transactions, threshold), [transactions, threshold]);
+  const vendorFileInput = useRef<HTMLInputElement>(null);
+  const invoiceFileInput = useRef<HTMLInputElement>(null);
+  const paymentFileInput = useRef<HTMLInputElement>(null);
+  const moneyTrailMap = useMemo(() => buildMoneyTrailMap(supportingData), [supportingData]);
+  const findings = useMemo(() => analyze(transactions, threshold, moneyTrailMap), [transactions, threshold, moneyTrailMap]);
   const selected = findings.find((finding) => finding.id === selectedId) ?? findings[0] ?? null;
   const filteredFindings = useMemo(() => {
     const searchTerm = search.toLowerCase();
@@ -326,6 +566,44 @@ function App() {
     reader.onerror = () => setUploadError('The file could not be read. Try exporting the ledger as UTF-8 CSV.');
     reader.readAsText(file);
   };
+  const handleSupportingFile = (kind: SupportingFileKind, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setSupportingFileError('');
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setSupportingFileError('Supporting files must be CSV files.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? '');
+      if (kind === 'vendor') {
+        const parsed = parseVendorMasterCsv(text);
+        if (parsed.error || !parsed.rows.length) {
+          setSupportingFileError(parsed.error ?? 'No usable vendor records found.');
+          return;
+        }
+        setSupportingData((current) => ({ ...current, vendors: parsed.rows, vendorFileName: file.name }));
+      } else if (kind === 'invoice') {
+        const parsed = parseInvoicesCsv(text);
+        if (parsed.error || !parsed.rows.length) {
+          setSupportingFileError(parsed.error ?? 'No usable invoice records found.');
+          return;
+        }
+        setSupportingData((current) => ({ ...current, invoices: parsed.rows, invoiceFileName: file.name }));
+      } else {
+        const parsed = parsePaymentsCsv(text);
+        if (parsed.error || !parsed.rows.length) {
+          setSupportingFileError(parsed.error ?? 'No usable payment records found.');
+          return;
+        }
+        setSupportingData((current) => ({ ...current, payments: parsed.rows, paymentFileName: file.name }));
+      }
+    };
+    reader.onerror = () => setSupportingFileError(`The ${kind} file could not be read. Try exporting it as UTF-8 CSV.`);
+    reader.readAsText(file);
+    event.target.value = '';
+  };
   const exportFindings = () => {
     const header = 'Transaction ID,Date,Account,Vendor,Amount,Exception Type,Risk\n';
     const body = findings.map((finding) => [finding.id, finding.date, finding.account, finding.vendor, finding.amount, finding.exceptions.map((exception) => exception.type).join('; '), finding.risk].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -346,6 +624,9 @@ function App() {
   return (
     <div className="audit-noise min-h-[100dvh] bg-background text-foreground">
       <input ref={fileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} data-testid="input-csv-file" />
+      <input ref={vendorFileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => handleSupportingFile('vendor', event)} data-testid="input-vendor-master-file" />
+      <input ref={invoiceFileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => handleSupportingFile('invoice', event)} data-testid="input-invoices-file" />
+      <input ref={paymentFileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => handleSupportingFile('payment', event)} data-testid="input-payments-file" />
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-[248px] flex-col bg-sidebar text-sidebar-foreground transition-transform duration-300 lg:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-6">
           <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-sidebar-primary text-sidebar-primary-foreground"><Landmark size={19} strokeWidth={2.5} /></div>
@@ -385,7 +666,23 @@ function App() {
             <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
               <div className="absolute right-0 top-0 h-full w-1/3 opacity-60" style={{ background: 'radial-gradient(circle at 70% 30%, hsl(67 66% 63% / .22), transparent 60%)' }} />
               <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div><div className="mb-2 flex items-center gap-2"><FileCheck2 size={17} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Source ledger</span></div><div className="flex flex-wrap items-center gap-3"><h2 className="text-base font-semibold">{fileName}</h2><span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Loaded</span></div><p className="mt-2 text-xs text-muted-foreground">{transactions.length} rows · fictional data · ready for local analysis</p></div><button onClick={() => fileInput.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-muted" data-testid="button-replace-csv"><Upload size={14} /> Replace file</button></div>
-              {uploadError && <div className="relative mt-5 flex items-start gap-3 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-upload-error"><AlertCircle size={16} className="mt-0.5 shrink-0" /><div><div className="font-semibold">We could not load that ledger</div><div className="mt-1 leading-5">{uploadError}</div></div><button onClick={() => setUploadError('')} className="ml-auto p-1" aria-label="Dismiss upload error" data-testid="button-dismiss-upload-error"><X size={14} /></button></div>}
+               {uploadError && <div className="relative mt-5 flex items-start gap-3 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-upload-error"><AlertCircle size={16} className="mt-0.5 shrink-0" /><div><div className="font-semibold">We could not load that ledger</div><div className="mt-1 leading-5">{uploadError}</div></div><button onClick={() => setUploadError('')} className="ml-auto p-1" aria-label="Dismiss upload error" data-testid="button-dismiss-upload-error"><X size={14} /></button></div>}
+               <div className="relative mt-6 border-t border-border/80 pt-5">
+                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                   <div>
+                     <div className="mb-1 flex items-center gap-2"><Landmark size={15} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Follow the money</span></div>
+                     <p className="text-xs leading-5 text-muted-foreground">Link local invoices, vendors, and payments to the GL entry in each investigation.</p>
+                   </div>
+                   <span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Local files</span>
+                 </div>
+                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                   <SupportingFileCard label="Vendor master" fileName={supportingData.vendorFileName} rowCount={supportingData.vendors.length} onClick={() => vendorFileInput.current?.click()} />
+                   <SupportingFileCard label="Invoices" fileName={supportingData.invoiceFileName} rowCount={supportingData.invoices.length} onClick={() => invoiceFileInput.current?.click()} />
+                   <SupportingFileCard label="Payments" fileName={supportingData.paymentFileName} rowCount={supportingData.payments.length} onClick={() => paymentFileInput.current?.click()} />
+                 </div>
+                 <p className="mt-3 font-mono text-[10px] leading-4 text-muted-foreground">{transactions.filter((transaction) => moneyTrailMap.has(transaction.id)).length.toLocaleString()} invoice links available for the loaded GL · vendor bank-account and invoice-number checks run locally.</p>
+                 {supportingFileError && <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-supporting-file-error"><AlertCircle size={15} className="mt-0.5 shrink-0" /><span>{supportingFileError}</span><button onClick={() => setSupportingFileError('')} className="ml-auto p-1" aria-label="Dismiss supporting file error"><X size={14} /></button></div>}
+               </div>
             </div>
             <div id="rules-section" className="rounded-xl border border-border bg-[#e9ecda] p-5 shadow-sm sm:p-6"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><Settings2 size={16} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-primary">Review control</span></div><CircleHelp size={15} className="text-muted-foreground" /></div><label htmlFor="approval-threshold" className="text-xs font-semibold text-foreground">Approval threshold</label><div className="mt-2 flex gap-2"><div className="relative flex-1"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-muted-foreground">$</span><input id="approval-threshold" value={draftThreshold} onChange={(event) => setDraftThreshold(event.target.value.replace(/[^\d]/g, ''))} className="w-full rounded-md border border-[#c5ccad] bg-background py-2.5 pl-7 pr-3 font-mono text-sm outline-none ring-primary/20 transition focus:ring-2" data-testid="input-approval-threshold" /></div><button onClick={runAnalysis} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-60" disabled={isAnalyzing} data-testid="button-run-analysis">{isAnalyzing ? <Clock3 size={14} className="audit-pulse" /> : <Play size={14} />} {isAnalyzing ? 'Running' : 'Run tests'}</button></div><p className="mt-2 font-mono text-[10px] leading-4 text-muted-foreground">Proximity test flags entries from {currency(Math.max(0, Number(draftThreshold || 0) * .95))} to just below threshold.</p></div>
           </section>
@@ -497,6 +794,7 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
             <DataPoint label="Account" value={finding.account.split(' · ')[1] ?? finding.account} />
           </div>
         </InvestigationBlock>
+        <FollowMoneyTrail finding={finding} />
         {finding.related.length > 0 && <InvestigationBlock label="Related transactions"><div className="flex flex-wrap gap-2">{finding.related.map((id) => <span key={id} className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] px-2 py-1 font-mono text-[10px] text-primary">{id}</span>)}</div></InvestigationBlock>}
       </div>
     </aside>
@@ -509,6 +807,61 @@ function InvestigationBlock({ label, children }: { label: string; children: Reac
 
 function DataPoint({ label, value }: { label: string; value: string }) {
   return <div><div className="font-mono text-[9px] uppercase tracking-[.1em] text-[#718272]">{label}</div><div className="mt-1 truncate pr-2 text-xs font-medium" title={value}>{value}</div></div>;
+}
+
+function SupportingFileCard({ label, fileName, rowCount, onClick }: { label: string; fileName: string; rowCount: number; onClick: () => void }) {
+  return <button onClick={onClick} className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-left transition hover:border-primary/50 hover:bg-[#eef2e9]" type="button"><div className="text-[11px] font-semibold">{label}</div><div className="mt-1 truncate font-mono text-[9px] text-primary" title={fileName}>{fileName}</div><div className="mt-1 text-[10px] text-muted-foreground">{rowCount.toLocaleString()} rows · Replace</div></button>;
+}
+
+function FollowMoneyTrail({ finding }: { finding: Finding }) {
+  const trail = finding.moneyTrail;
+  return (
+    <InvestigationBlock label="Follow the money">
+      <div className="space-y-2" data-testid={`money-trail-${finding.id}`}>
+        <TrailStep label="GL entry" identifier={finding.id}>
+          <DataPoint label="Amount" value={currency(finding.amount)} />
+          <DataPoint label="Posted" value={dateLabel(finding.date)} />
+          <DataPoint label="Account" value={finding.account} />
+        </TrailStep>
+        <TrailConnector />
+        {trail?.invoice ? <TrailStep label="Invoice" identifier={trail.invoice.invoiceId}>
+          <DataPoint label="Invoice number" value={trail.invoice.invoiceNumber} />
+          <DataPoint label="Invoice date" value={dateLabel(trail.invoice.invoiceDate)} />
+          <DataPoint label="Amount" value={currency(trail.invoice.amount)} />
+        </TrailStep> : <MissingTrailStep label="Invoice" message="No invoice matched this GL transaction ID." />}
+        <TrailConnector />
+        {trail?.vendor ? <TrailStep label="Vendor" identifier={trail.vendor.vendorId}>
+          <DataPoint label="Name" value={trail.vendor.vendorName} />
+          <DataPoint label="Created" value={dateLabel(trail.vendor.createdDate)} />
+          <DataPoint label="Primary account" value={trail.vendor.primaryAccount} />
+          <DataPoint label="Status" value={trail.vendor.status} />
+          <DataPoint label="Bank account ref" value={trail.vendor.bankAccountRef} />
+        </TrailStep> : <MissingTrailStep label="Vendor" message="No vendor matched the linked invoice." />}
+        <TrailConnector />
+        {trail?.payment ? <TrailStep label="Payment" identifier={trail.payment.paymentId}>
+          <DataPoint label="Payment date" value={dateLabel(trail.payment.paymentDate)} />
+          <DataPoint label="Amount" value={currency(trail.payment.amount)} />
+          <DataPoint label="Bank account ref" value={trail.payment.bankAccountRef} />
+        </TrailStep> : <MissingTrailStep label="Payment" message="No payment matched the linked invoice." />}
+      </div>
+      {trail?.flags.length ? <div className="mt-3 space-y-2" data-testid={`money-trail-flags-${finding.id}`}>
+        {trail.flags.map((flag) => <div key={flag.message} className="flex items-start gap-2 rounded-md border border-[#e2c68f] bg-[#fff8e5] p-2.5 text-[11px] leading-5 text-[#73551a]"><AlertCircle size={14} className="mt-0.5 shrink-0" /><span>{flag.message}{flag.detail && <span className="mt-0.5 block text-[10px] text-[#89671c]">{flag.detail}</span>}</span></div>)}
+      </div> : trail && <div className="mt-3 rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-[11px] leading-5 text-[#536659]">No trail red flags detected for this transaction.</div>}
+      {!trail && <div className="mt-3 rounded-md border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-[11px] leading-5 text-[#536659]">No invoice is linked to this GL entry in the loaded supporting files.</div>}
+    </InvestigationBlock>
+  );
+}
+
+function TrailStep({ label, identifier, children }: { label: string; identifier: string; children: ReactNode }) {
+  return <div className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-3"><div className="mb-3 flex items-center justify-between gap-2"><span className="font-mono text-[9px] uppercase tracking-[.14em] text-primary">{label}</span><span className="font-mono text-[10px] font-medium text-primary">{identifier}</span></div><div className="grid grid-cols-2 gap-x-3 gap-y-3">{children}</div></div>;
+}
+
+function MissingTrailStep({ label, message }: { label: string; message: string }) {
+  return <div className="rounded-md border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-3"><div className="font-mono text-[9px] uppercase tracking-[.14em] text-primary">{label}</div><div className="mt-2 text-[11px] leading-5 text-muted-foreground">{message}</div></div>;
+}
+
+function TrailConnector() {
+  return <div className="ml-4 h-3 w-px bg-[#b9c7b3]" aria-hidden="true" />;
 }
 
 const queryClient = new QueryClient();
