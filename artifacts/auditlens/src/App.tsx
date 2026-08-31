@@ -38,6 +38,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import northstarLedgerCsv from '@assets/northstar_general_ledger_2024_v2_1788138560099.csv?raw';
 import vendorMasterCsv from '@assets/vendor_master_1788078370267.csv?raw';
 import invoicesCsv from '@assets/invoices_1788078370267.csv?raw';
 import paymentsCsv from '@assets/payments_1788078370266.csv?raw';
@@ -115,28 +116,6 @@ type AccountStatistics = {
   max: number;
 };
 
-const sampleTransactions: Transaction[] = [
-  { id: 'GL-2401', date: '2024-06-03', account: '6100 · Facilities', vendor: 'Northstar Facilities', amount: 8420, description: 'June building services' },
-  { id: 'GL-2402', date: '2024-06-04', account: '6210 · Software', vendor: 'Cedar Cloud Tools', amount: 9940, description: 'Annual collaboration licenses' },
-  { id: 'GL-2403', date: '2024-06-05', account: '6210 · Software', vendor: 'Cedar Cloud Tools', amount: 9940, description: 'Annual collaboration licenses' },
-  { id: 'GL-2404', date: '2024-06-07', account: '6400 · Travel', vendor: 'Pine & Rail Travel', amount: 2180, description: 'Client site travel' },
-  { id: 'GL-2405', date: '2024-06-08', account: '6300 · Contractors', vendor: 'Morrow Studio LLC', amount: 12850, description: 'Brand system phase two' },
-  { id: 'GL-2406', date: '2024-06-10', account: '6000 · Office', vendor: 'Paper Kite Supply', amount: 3760, description: 'Quarterly office supplies' },
-  { id: 'GL-2417', date: '2024-06-03', account: '6000 · Office', vendor: 'Summit Office Interiors', amount: 3200, description: 'Workspace furniture deposit' },
-  { id: 'GL-2418', date: '2024-06-06', account: '6000 · Office', vendor: 'Summit Office Interiors', amount: 3800, description: 'Workspace furniture delivery' },
-  { id: 'GL-2419', date: '2024-06-11', account: '6000 · Office', vendor: 'Summit Office Interiors', amount: 4200, description: 'Workspace furniture installation' },
-  { id: 'GL-2407', date: '2024-06-12', account: '6500 · Professional', vendor: 'Harbor Legal Group', amount: 26800, description: 'Contract review and filing' },
-  { id: 'GL-2408', date: '2024-06-14', account: '6300 · Contractors', vendor: 'Morrow Studio LLC', amount: 10120, description: 'Brand system phase two' },
-  { id: 'GL-2409', date: '2024-06-15', account: '6800 · Events', vendor: 'Lumen House Events', amount: 7200, description: 'Partner roundtable venue' },
-  { id: 'GL-2410', date: '2024-06-18', account: '6100 · Facilities', vendor: 'Northstar Facilities', amount: 8420, description: 'June building services' },
-  { id: 'GL-2411', date: '2024-06-21', account: '6710 · Equipment', vendor: 'Atlas Field Systems', amount: 43800, description: 'Mobile scanning equipment' },
-  { id: 'GL-2412', date: '2024-06-22', account: '6400 · Travel', vendor: 'Pine & Rail Travel', amount: 1980, description: 'Client site travel' },
-  { id: 'GL-2413', date: '2024-06-24', account: '6210 · Software', vendor: 'Cedar Cloud Tools', amount: 2280, description: 'Usage overage' },
-  { id: 'GL-2414', date: '2024-06-26', account: '6900 · Miscellaneous', vendor: 'Vela Printworks', amount: 9850, description: 'Campaign materials' },
-  { id: 'GL-2415', date: '2024-06-29', account: '6300 · Contractors', vendor: 'Brightline Advisory', amount: 14750, description: 'Operational review sprint' },
-  { id: 'GL-2416', date: '2024-07-01', account: '6100 · Facilities', vendor: 'Northstar Facilities', amount: 8600, description: 'July building services' },
-];
-
 const testDefinitions: { type: ExceptionType; label: string; rule: string; tone: string }[] = [
   { type: 'Duplicate transaction', label: 'Duplicate transactions', rule: 'Same vendor and account, amount within $1, posted within 3 days', tone: 'rose' },
   { type: 'Approval proximity', label: 'Approval threshold proximity', rule: 'Amount falls within 5% below approval threshold', tone: 'amber' },
@@ -150,6 +129,7 @@ const currency = (value: number) => value.toLocaleString('en-US', { style: 'curr
 const compactCurrency = (value: number) => value >= 1000000 ? `$${(value / 1000000).toFixed(1)}m` : value >= 1000 ? `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k` : currency(value);
 const dateLabel = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const isWeekend = (value: string) => [0, 6].includes(new Date(`${value}T12:00:00`).getDay());
+const replaceFileButtonClass = 'inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110';
 const calendarDay = (value: string) => {
   const [year, month, day] = value.split('-').map(Number);
   return Date.UTC(year, month - 1, day);
@@ -503,19 +483,21 @@ const initialSupportingData: SupportingData = {
   invoiceFileName: 'invoices.csv',
   paymentFileName: 'payments.csv',
 };
+const sampleTransactions = parseCsv(northstarLedgerCsv).rows;
+const defaultLedgerFileName = 'northstar_general_ledger_2024_v2.csv';
 
 function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactions);
   const [threshold, setThreshold] = useState(10000);
   const [draftThreshold, setDraftThreshold] = useState('10000');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [fileName, setFileName] = useState('fictional_q2_general_ledger.csv');
+  const [fileName, setFileName] = useState(defaultLedgerFileName);
   const [uploadError, setUploadError] = useState('');
   const [supportingData, setSupportingData] = useState<SupportingData>(initialSupportingData);
   const [supportingFileError, setSupportingFileError] = useState('');
   const [hasStartedReview, setHasStartedReview] = useState(false);
   const [activeNav, setActiveNav] = useState('overview');
-  const [selectedId, setSelectedId] = useState<string | null>('GL-2407');
+  const [selectedId, setSelectedId] = useState<string | null>(sampleTransactions[0]?.id ?? null);
   const [isInvestigationOpen, setIsInvestigationOpen] = useState(false);
   const [returnScrollY, setReturnScrollY] = useState(0);
   const [search, setSearch] = useState('');
@@ -569,9 +551,9 @@ function App() {
   };
   const useSample = () => {
     setTransactions(sampleTransactions);
-    setFileName('fictional_q2_general_ledger.csv');
+    setFileName(defaultLedgerFileName);
     setUploadError('');
-    setSelectedId('GL-2407');
+    setSelectedId(sampleTransactions[0]?.id ?? null);
   };
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -800,7 +782,7 @@ function App() {
                    <div className="flex flex-wrap items-center gap-3"><h2 className="text-base font-semibold">{fileName}</h2><span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Loaded</span></div>
                    <p className="mt-2 text-xs text-muted-foreground">{transactions.length} rows · fictional data · ready for local analysis</p>
                    <div className="mt-5 flex flex-wrap items-center gap-3">
-                     <button onClick={() => fileInput.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110" data-testid="button-replace-csv"><Upload size={14} /> Replace ledger</button>
+                     <button onClick={() => fileInput.current?.click()} className={replaceFileButtonClass} data-testid="button-replace-csv"><Upload size={14} /> Replace ledger</button>
                      <span className="font-mono text-[10px] text-muted-foreground">CSV only · analyzed in this browser</span>
                    </div>
                    {uploadError && <div className="mt-5 flex items-start gap-3 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-upload-error"><AlertCircle size={16} className="mt-0.5 shrink-0" /><div><div className="font-semibold">We could not load that ledger</div><div className="mt-1 leading-5">{uploadError}</div></div><button onClick={() => setUploadError('')} className="ml-auto p-1" aria-label="Dismiss upload error" data-testid="button-dismiss-upload-error"><X size={14} /></button></div>}
@@ -1016,7 +998,14 @@ function DataPoint({ label, value }: { label: string; value: string }) {
 }
 
 function SupportingFileCard({ label, fileName, rowCount, onClick }: { label: string; fileName: string; rowCount: number; onClick: () => void }) {
-  return <button onClick={onClick} className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-left transition hover:border-primary/50 hover:bg-[#eef2e9]" type="button"><div className="text-[11px] font-semibold">{label}</div><div className="mt-1 truncate font-mono text-[9px] text-primary" title={fileName}>{fileName}</div><div className="mt-1 text-[10px] text-muted-foreground">{rowCount.toLocaleString()} rows · Replace</div></button>;
+  return <div className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-left">
+    <div className="text-[11px] font-semibold">{label}</div>
+    <div className="mt-1 truncate font-mono text-[9px] text-primary" title={fileName}>{fileName}</div>
+    <div className="mt-2 flex items-center justify-between gap-2">
+      <span className="text-[10px] text-muted-foreground">{rowCount.toLocaleString()} rows</span>
+      <button onClick={onClick} className={replaceFileButtonClass} type="button" data-testid={`button-replace-${label.toLowerCase().replace(/\s+/g, '-')}`}><Upload size={14} /> Replace ledger</button>
+    </div>
+  </div>;
 }
 
 type TrailStepKey = 'gl' | 'invoice' | 'vendor' | 'payment';
