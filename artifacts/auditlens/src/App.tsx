@@ -651,8 +651,9 @@ function App() {
 
   const navItems = [
     { id: 'overview', label: 'Review overview', icon: LayoutDashboard },
-    { id: 'exceptions', label: 'Exceptions', icon: ShieldAlert, count: findings.length },
+    { id: 'rules', label: 'Test configuration', icon: Settings2 },
     { id: 'data', label: 'Source data', icon: FileBarChart, count: transactions.length },
+    { id: 'exceptions', label: 'Exceptions', icon: ShieldAlert, count: findings.length },
   ];
 
   if (!hasStartedReview) {
@@ -748,19 +749,20 @@ function App() {
           <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-sidebar-primary text-sidebar-primary-foreground"><Landmark size={19} strokeWidth={2.5} /></div>
           <div><div className="font-serif text-[19px] font-bold tracking-[-.03em]">AuditLens</div><div className="font-mono text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/55">ledger intelligence</div></div>
         </button>
-        <div className="px-4 pt-8">
-          <div className="mb-3 px-3 font-mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/40">Workspace</div>
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-               return <button key={item.id} onClick={() => { setActiveNav(item.id); setMobileNav(false); if (item.id === 'overview') window.scrollTo({ top: 0, behavior: 'smooth' }); if (item.id === 'exceptions') document.getElementById('exceptions-section')?.scrollIntoView({ behavior: 'smooth' }); if (item.id === 'data') document.getElementById('source-section')?.scrollIntoView({ behavior: 'smooth' }); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${activeNav === item.id ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'}`} data-testid={`button-nav-${item.id}`}><span className="flex items-center gap-3"><Icon size={16} /><span>{item.label}</span></span>{item.count !== undefined && <span className="font-mono text-[10px] text-sidebar-foreground/45">{item.count}</span>}</button>;
-            })}
-          </nav>
-        </div>
-        <div className="mt-8 px-4">
-          <div className="mb-3 px-3 font-mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/40">Controls</div>
-          <button onClick={() => document.getElementById('rules-section')?.scrollIntoView({ behavior: 'smooth' })} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-sidebar-foreground/65 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-foreground" data-testid="button-nav-rules"><SlidersHorizontal size={16} /><span>Test configuration</span></button>
-        </div>
+         <div className="px-4 pt-8">
+           <div className="mb-3 px-3 font-mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/40">Workspace</div>
+           <nav className="space-y-1">
+             {navItems.map((item) => {
+               const Icon = item.icon;
+               return <button key={item.id} onClick={() => {
+                 setActiveNav(item.id);
+                 setMobileNav(false);
+                 const targetId = item.id === 'overview' ? 'overview-section' : item.id === 'rules' ? 'rules-section' : item.id === 'data' ? 'source-section' : 'exceptions-section';
+                 document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+               }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${activeNav === item.id ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'}`} data-testid={`button-nav-${item.id}`}><span className="flex items-center gap-3"><Icon size={16} /><span>{item.label}</span></span>{item.count !== undefined && <span className="font-mono text-[10px] text-sidebar-foreground/45">{item.count}</span>}</button>;
+             })}
+           </nav>
+         </div>
       </aside>
       {mobileNav && <button className="fixed inset-0 z-20 bg-sidebar/30 lg:hidden" onClick={() => setMobileNav(false)} aria-label="Close navigation" data-testid="button-close-navigation" />}
       <main className="min-h-[100dvh] lg:pl-[248px]">
