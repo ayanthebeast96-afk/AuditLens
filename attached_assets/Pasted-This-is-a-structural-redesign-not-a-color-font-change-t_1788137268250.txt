@@ -1,0 +1,49 @@
+This is a structural redesign, not a color/font change — the current layout 
+must actually change, not just be reskinned with new colors on the same 
+component structure.
+
+1. HOME NAVIGATION
+The logo/icon in the top-left must be clickable and navigate to a proper 
+Home/About view — a landing page separate from the review workspace. If 
+one already exists in the codebase but isn't wired up, connect it. If it 
+doesn't exist, build one: brief description of what AuditLens does, the 
+six detection tests it runs, and a "Start Review" button that takes the 
+user into the actual workspace. This should NOT be the same page as the 
+review workspace — it's a separate view the user lands on first and can 
+return to anytime by clicking the logo.
+
+2. REDESIGNED UPLOAD EXPERIENCE
+When no ledger is loaded, the primary focus of the workspace should be a 
+clearly designed upload area — not one card among several equal-weight 
+cards. It should:
+- Clearly display the expected CSV column format: id, date, account, 
+  vendor, amount, description — shown directly in the UI, not hidden in 
+  a tooltip, so it's self-explanatory without needing to ask what format 
+  is expected.
+- Support drag-and-drop, plus a standard file browse button.
+- Offer "or use the sample dataset" as a clearly secondary option, not 
+  equal visual weight to uploading real data.
+
+3. TRANSACTION DETAIL VIEW
+Clicking any transaction — from the Exceptions table OR Source Data — 
+should open a dedicated, full transaction view (a slide-over panel, modal, 
+or dedicated page, whichever fits this framework best) rather than 
+expanding inline within the table row. This view should contain, in one 
+well-organized place, not requiring a long scroll to reach any part of it:
+- The transaction's core facts (date, account, vendor, amount)
+- Which tests were triggered and why, with the suggested audit procedure
+- The Follow the Money trail (GL Entry -> Invoice -> Vendor -> Payment) 
+  and any red flags from it
+Use clear visual sections or a layout (e.g. two columns, or a compact tab 
+structure) so all of this is reachable without extensive scrolling, but 
+the emphasis is on this being ONE cohesive "opening the transaction" 
+experience, not several separate stacked panels.
+
+4. OVERALL LAYOUT
+Reduce the number of separate boxed cards competing for attention on the 
+main workspace view. The dashboard stats, source ledger info, and Follow 
+the Money file status should feel like one cohesive page, not a grid of 
+independent widgets. Simplify and restructure, don't just recolor.
+
+Do not change any underlying detection logic, test results, or data 
+handling — this is purely about layout, navigation, and structure.
