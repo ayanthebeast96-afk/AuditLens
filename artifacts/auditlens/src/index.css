@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -78,52 +79,52 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  --background: 42 29% 94%;
-  --foreground: 196 42% 15%;
-  --border: 39 19% 83%;
-  --card: 44 33% 97%;
-  --card-foreground: 196 42% 15%;
-  --card-border: 39 19% 83%;
-  --sidebar: 191 38% 16%;
-  --sidebar-foreground: 42 29% 94%;
-  --sidebar-border: 190 27% 25%;
-  --sidebar-primary: 67 66% 63%;
-  --sidebar-primary-foreground: 191 38% 16%;
-  --sidebar-accent: 190 26% 23%;
-  --sidebar-accent-foreground: 42 29% 94%;
-  --sidebar-ring: 67 66% 63%;
-  --popover: 44 33% 97%;
-  --popover-foreground: 196 42% 15%;
-  --popover-border: 39 19% 83%;
-  --primary: 184 61% 29%;
-  --primary-foreground: 42 29% 96%;
-  --secondary: 41 30% 89%;
-  --secondary-foreground: 196 42% 15%;
-  --muted: 41 24% 90%;
-  --muted-foreground: 193 15% 44%;
-  --accent: 67 66% 63%;
-  --accent-foreground: 191 38% 16%;
-  --destructive: 4 63% 48%;
-  --destructive-foreground: 42 29% 96%;
-  --input: 39 19% 78%;
-  --ring: 184 61% 29%;
-  --chart-1: 184 61% 29%;
-  --chart-2: 42 77% 55%;
-  --chart-3: 4 63% 48%;
-  --chart-4: 198 45% 45%;
-  --chart-5: 67 66% 63%;
-  --app-font-sans: Arial, Helvetica, sans-serif;
-  --app-font-serif: Georgia, 'Times New Roman', serif;
-  --app-font-mono: 'Courier New', Courier, monospace;
-  --radius: 0.5rem; /* 8px */
-  --shadow-2xs: 0px 2px 0px 0px hsl(191 38% 16% / 0.03);
-  --shadow-xs: 0px 2px 0px 0px hsl(191 38% 16% / 0.04);
-  --shadow-sm: 0px 3px 0px 0px hsl(191 38% 16% / 0.03), 0px 1px 4px -1px hsl(191 38% 16% / 0.12);
-  --shadow: 0px 4px 0px 0px hsl(191 38% 16% / 0.03), 0px 2px 8px -2px hsl(191 38% 16% / 0.14);
-  --shadow-md: 0px 8px 16px -6px hsl(191 38% 16% / 0.18);
-  --shadow-lg: 0px 14px 28px -12px hsl(191 38% 16% / 0.2);
-  --shadow-xl: 0px 20px 40px -15px hsl(191 38% 16% / 0.23);
-  --shadow-2xl: 0px 25px 50px -20px hsl(191 38% 16% / 0.3);
+  --background: 42 43% 96%;
+  --foreground: 210 7% 16%;
+  --border: 39 19% 82%;
+  --card: 42 38% 98%;
+  --card-foreground: 210 7% 16%;
+  --card-border: 39 19% 82%;
+  --sidebar: 218 47% 20%;
+  --sidebar-foreground: 42 43% 96%;
+  --sidebar-border: 218 31% 32%;
+  --sidebar-primary: 42 69% 47%;
+  --sidebar-primary-foreground: 218 47% 20%;
+  --sidebar-accent: 218 36% 27%;
+  --sidebar-accent-foreground: 42 43% 96%;
+  --sidebar-ring: 42 69% 47%;
+  --popover: 42 38% 98%;
+  --popover-foreground: 210 7% 16%;
+  --popover-border: 39 19% 82%;
+  --primary: 218 47% 20%;
+  --primary-foreground: 42 43% 96%;
+  --secondary: 41 24% 90%;
+  --secondary-foreground: 210 7% 16%;
+  --muted: 41 24% 91%;
+  --muted-foreground: 210 6% 40%;
+  --accent: 42 69% 47%;
+  --accent-foreground: 218 47% 20%;
+  --destructive: 350 57% 35%;
+  --destructive-foreground: 42 43% 96%;
+  --input: 39 19% 76%;
+  --ring: 218 47% 20%;
+  --chart-1: 218 47% 20%;
+  --chart-2: 161 33% 27%;
+  --chart-3: 42 69% 47%;
+  --chart-4: 350 57% 35%;
+  --chart-5: 39 19% 52%;
+  --app-font-sans: 'IBM Plex Sans', ui-sans-serif, sans-serif;
+  --app-font-serif: 'Source Serif 4', Georgia, serif;
+  --app-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --radius: 0.2rem;
+  --shadow-2xs: 0 1px 0 hsl(218 47% 20% / 0.05);
+  --shadow-xs: 0 1px 0 hsl(218 47% 20% / 0.06);
+  --shadow-sm: 0 1px 0 hsl(218 47% 20% / 0.08);
+  --shadow: 0 2px 0 hsl(218 47% 20% / 0.08);
+  --shadow-md: 0 3px 0 hsl(218 47% 20% / 0.1);
+  --shadow-lg: 0 4px 0 hsl(218 47% 20% / 0.12);
+  --shadow-xl: 0 5px 0 hsl(218 47% 20% / 0.12);
+  --shadow-2xl: 0 6px 0 hsl(218 47% 20% / 0.14);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -379,4 +380,156 @@
   opacity: .025;
   z-index: 20;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+}
+
+/* AuditLens editorial system */
+html { background: #faf7f0; }
+body {
+  background: #faf7f0;
+  color: #26282b;
+  font-variant-numeric: proportional-nums;
+}
+button, input, select { border-radius: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex="0"]:focus-visible {
+  outline: 2px solid #c9a227;
+  outline-offset: 2px;
+}
+.font-mono, code, kbd, pre, .font-mono * {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.uppercase { text-transform: none !important; }
+.rounded-xl { border-radius: 2px !important; }
+.rounded-lg { border-radius: 2px !important; }
+.rounded-md { border-radius: 2px !important; }
+.rounded-full { border-radius: 999px !important; }
+.shadow-sm, .shadow, .shadow-md { box-shadow: 0 1px 0 rgba(27, 42, 74, .09) !important; }
+.landing-shell {
+  min-height: 100dvh;
+  background: #faf7f0;
+  color: #26282b;
+}
+.landing-header {
+  border-bottom: 1px solid rgba(27,42,74,.18);
+  background: rgba(250,247,240,.94);
+}
+.landing-mark {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  color: #faf7f0;
+  background: #1b2a4a;
+  border: 1px solid #1b2a4a;
+}
+.landing-rule {
+  height: 1px;
+  background: #c9a227;
+  transform-origin: left;
+}
+.landing-kicker {
+  color: #2f5d50;
+  letter-spacing: .14em;
+}
+.landing-title {
+  color: #1b2a4a;
+  font-size: clamp(3.4rem, 9vw, 8rem);
+  line-height: .9;
+  letter-spacing: -.065em;
+}
+.landing-title em {
+  color: #8b2635;
+  font-style: normal;
+}
+.landing-feature {
+  border-top: 1px solid rgba(27,42,74,.2);
+  padding-top: 1rem;
+}
+.landing-feature-index {
+  color: #c9a227;
+  font-family: var(--app-font-mono);
+  font-size: .7rem;
+}
+.landing-rail {
+  border-left: 1px solid rgba(27,42,74,.24);
+}
+.landing-start {
+  background: #1b2a4a;
+  color: #faf7f0;
+  border: 1px solid #1b2a4a;
+  transition: background-color .18s ease, transform .18s ease;
+}
+.landing-start:hover {
+  background: #2f5d50;
+  transform: translateY(-2px);
+}
+.landing-start:active { transform: translateY(0); }
+.workspace-shell aside { border-right: 1px solid rgba(250,247,240,.14); }
+.workspace-shell header { background: rgba(250,247,240,.96); }
+.trail-flow {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.trail-flow::before {
+  content: '';
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 19px;
+  height: 1px;
+  background: #b9c5b6;
+  z-index: 0;
+}
+.trail-node {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  border: 1px solid #c7d1c5;
+  background: #f8f8f1;
+  padding: 10px;
+  text-align: left;
+  transition: border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+.trail-node:hover, .trail-node[data-selected="true"] {
+  border-color: #2f5d50;
+  background: #eef2e8;
+  transform: translateY(-1px);
+}
+.trail-node[data-missing="true"] { border-style: dashed; }
+.trail-node-index {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  margin-bottom: 9px;
+  place-items: center;
+  border: 1px solid #2f5d50;
+  background: #faf7f0;
+  color: #2f5d50;
+  font: 500 9px/1 var(--app-font-mono);
+}
+.trail-node[data-missing="true"] .trail-node-index {
+  border-color: #8b2635;
+  color: #8b2635;
+}
+.trail-detail {
+  border-left: 3px solid #2f5d50;
+  background: #f8f8f1;
+}
+.trail-detail-missing {
+  border-left-color: #8b2635;
+  background: #fbf1ed;
+}
+.trail-flag {
+  border-left: 3px solid #c9a227;
+  background: #fff8e5;
+}
+.trail-flag strong { color: #73551a; }
+@media (max-width: 767px) {
+  .landing-title { font-size: clamp(3.3rem, 19vw, 5.5rem); }
+  .landing-rail { border-left: 0; border-top: 1px solid rgba(27,42,74,.24); }
+  .trail-flow { grid-template-columns: 1fr; gap: 6px; }
+  .trail-flow::before { left: 19px; right: auto; top: 18px; bottom: 18px; width: 1px; height: auto; }
+  .trail-node { display: flex; align-items: center; gap: 10px; padding: 9px; }
+  .trail-node-index { margin: 0; flex: 0 0 auto; }
 }

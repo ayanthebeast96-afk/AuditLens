@@ -1,21 +1,26 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import type { ReactNode } from 'react';
 import {
   AlertCircle,
+  ArrowRight,
   ArrowUpDown,
   BarChart3,
   CalendarDays,
   Check,
   ChevronDown,
   CircleHelp,
+  CheckCircle2,
   ClipboardCheck,
   Clock3,
   Download,
   FileBarChart,
   FileCheck2,
+  FileSearch,
   FileText,
   Filter,
   Landmark,
+  Link2,
+  LockKeyhole,
   LayoutDashboard,
   ListFilter,
   Menu,
@@ -508,6 +513,7 @@ function App() {
   const [uploadError, setUploadError] = useState('');
   const [supportingData, setSupportingData] = useState<SupportingData>(initialSupportingData);
   const [supportingFileError, setSupportingFileError] = useState('');
+  const [hasStartedReview, setHasStartedReview] = useState(false);
   const [activeNav, setActiveNav] = useState('overview');
   const [selectedId, setSelectedId] = useState<string | null>('GL-2407');
   const [search, setSearch] = useState('');
@@ -641,8 +647,85 @@ function App() {
     { id: 'data', label: 'Source data', icon: FileBarChart, count: transactions.length },
   ];
 
+  if (!hasStartedReview) {
+    return (
+      <div className="landing-shell audit-noise" data-testid="landing-state">
+        <header className="landing-header flex items-center justify-between px-5 py-5 sm:px-10 lg:px-16">
+          <div className="flex items-center gap-3">
+            <div className="landing-mark" aria-hidden="true"><Landmark size={18} strokeWidth={2.2} /></div>
+            <div>
+              <div className="font-serif text-[22px] font-semibold leading-none tracking-[-.04em] text-[#1b2a4a]">AuditLens</div>
+              <div className="mt-1 font-mono text-[9px] tracking-[.13em] text-[#2f5d50]">Local review workspace</div>
+            </div>
+          </div>
+          <div className="hidden items-center gap-2 font-mono text-[10px] tracking-[.1em] text-[#26282b]/55 sm:flex">
+            <LockKeyhole size={13} /> private by default
+          </div>
+        </header>
+        <main className="mx-auto grid max-w-[1440px] gap-12 px-5 pb-16 pt-16 sm:px-10 sm:pt-24 lg:grid-cols-[1.2fr_.8fr] lg:gap-20 lg:px-16 lg:pb-24">
+          <section className="max-w-[880px]">
+            <div className="landing-kicker mb-7 flex items-center gap-3 font-mono text-[10px] font-medium">
+              <span className="landing-rule w-12" /> General ledger exception review
+            </div>
+            <h1 className="landing-title font-serif font-semibold">
+              Put the ledger<br /><em>under a clear light.</em>
+            </h1>
+            <p className="mt-8 max-w-[640px] text-base leading-7 text-[#26282b]/72 sm:text-lg">
+              AuditLens is a transparent first pass over general-ledger exceptions, built to help audit teams move from an unusual entry to the evidence behind it.
+            </p>
+            <div className="mt-9 flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setHasStartedReview(true)}
+                className="landing-start inline-flex items-center gap-3 px-5 py-3 text-sm font-semibold"
+                data-testid="button-start-review"
+              >
+                Start review <ArrowRight size={16} />
+              </button>
+              <span className="font-mono text-[10px] tracking-[.08em] text-[#26282b]/55">Sample Q2 ledger ready</span>
+            </div>
+            <div className="mt-20 grid gap-8 sm:grid-cols-3">
+              <div className="landing-feature">
+                <div className="landing-feature-index">01</div>
+                <div className="mt-3 flex items-center gap-2 text-[#1b2a4a]"><ClipboardCheck size={16} /><h2 className="text-sm font-semibold">Deterministic tests</h2></div>
+                <p className="mt-2 text-xs leading-5 text-[#26282b]/65">Six explicit checks show exactly why an entry entered the queue.</p>
+              </div>
+              <div className="landing-feature">
+                <div className="landing-feature-index">02</div>
+                <div className="mt-3 flex items-center gap-2 text-[#1b2a4a]"><Link2 size={16} /><h2 className="text-sm font-semibold">Follow the Money</h2></div>
+                <p className="mt-2 text-xs leading-5 text-[#26282b]/65">Trace GL entry to invoice, vendor, and payment without leaving the review.</p>
+              </div>
+              <div className="landing-feature">
+                <div className="landing-feature-index">03</div>
+                <div className="mt-3 flex items-center gap-2 text-[#1b2a4a]"><LockKeyhole size={16} /><h2 className="text-sm font-semibold">Local and private</h2></div>
+                <p className="mt-2 text-xs leading-5 text-[#26282b]/65">Your files stay in this browser. No API calls, inference, or opaque scoring.</p>
+              </div>
+            </div>
+          </section>
+          <aside className="landing-rail self-end pl-0 sm:pl-8 lg:mb-4">
+            <div className="font-mono text-[10px] tracking-[.14em] text-[#2f5d50]">A reviewer's view</div>
+            <div className="mt-6 border-y border-[#1b2a4a]/20 py-6">
+              <div className="flex items-start gap-3">
+                <FileSearch size={18} className="mt-1 shrink-0 text-[#8b2635]" />
+                <div>
+                  <div className="font-serif text-2xl font-semibold leading-tight text-[#1b2a4a]">Evidence over spectacle.</div>
+                  <p className="mt-3 text-sm leading-6 text-[#26282b]/65">A measured workspace for professional judgment: clear tests, traceable context, and a review queue that respects the source ledger.</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-between font-mono text-[10px] text-[#26282b]/55">
+              <span>Fictional portfolio / Q2 FY24</span>
+              <span className="text-[#c9a227]">01—06</span>
+            </div>
+            <div className="mt-10 flex items-center gap-2 text-xs text-[#2f5d50]"><CheckCircle2 size={15} /> Ready for local analysis</div>
+          </aside>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="audit-noise min-h-[100dvh] bg-background text-foreground">
+    <div className="audit-noise workspace-shell min-h-[100dvh] bg-background text-foreground">
       <input ref={fileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} data-testid="input-csv-file" />
       <input ref={vendorFileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => handleSupportingFile('vendor', event)} data-testid="input-vendor-master-file" />
       <input ref={invoiceFileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => handleSupportingFile('invoice', event)} data-testid="input-invoices-file" />
@@ -683,8 +766,7 @@ function App() {
           </section>
 
            <section id="supporting-files-section" className="audit-rise audit-delay-1 mb-8 grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
-            <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
-              <div className="absolute right-0 top-0 h-full w-1/3 opacity-60" style={{ background: 'radial-gradient(circle at 70% 30%, hsl(67 66% 63% / .22), transparent 60%)' }} />
+             <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
               <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div><div className="mb-2 flex items-center gap-2"><FileCheck2 size={17} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Source ledger</span></div><div className="flex flex-wrap items-center gap-3"><h2 className="text-base font-semibold">{fileName}</h2><span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Loaded</span></div><p className="mt-2 text-xs text-muted-foreground">{transactions.length} rows · fictional data · ready for local analysis</p></div><button onClick={() => fileInput.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-muted" data-testid="button-replace-csv"><Upload size={14} /> Replace file</button></div>
                {uploadError && <div className="relative mt-5 flex items-start gap-3 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-upload-error"><AlertCircle size={16} className="mt-0.5 shrink-0" /><div><div className="font-semibold">We could not load that ledger</div><div className="mt-1 leading-5">{uploadError}</div></div><button onClick={() => setUploadError('')} className="ml-auto p-1" aria-label="Dismiss upload error" data-testid="button-dismiss-upload-error"><X size={14} /></button></div>}
                <div className="relative mt-6 border-t border-border/80 pt-5">
@@ -738,7 +820,7 @@ function App() {
 }
 
 function Metric({ label, value, detail, icon: Icon, accent = 'teal' }: { label: string; value: string; detail: string; icon: typeof FileText; accent?: string }) {
-  const colors: Record<string, string> = { teal: 'text-primary bg-[#dcece7]', rose: 'text-[#9a4b3d] bg-[#f8dfd9]', red: 'text-[#a23b31] bg-[#f8dfd9]', amber: 'text-[#98731e] bg-[#faedc7]', lime: 'text-[#55723e] bg-[#e5efd4]' };
+  const colors: Record<string, string> = { teal: 'text-[#2f5d50] bg-[#e6f0eb]', rose: 'text-[#8b2635] bg-[#f3e3e5]', red: 'text-[#8b2635] bg-[#f3e3e5]', amber: 'text-[#7b6211] bg-[#f6edca]', lime: 'text-[#2f5d50] bg-[#e6f0eb]' };
   return <div className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5"><div className={`mb-5 flex h-8 w-8 items-center justify-center rounded-md ${colors[accent]}`}>{<Icon size={16} />}</div><div className="font-mono text-2xl tracking-[-.04em] text-foreground sm:text-[27px]" data-testid={`metric-value-${label.toLowerCase().replace(/\s/g, '-')}`}>{value}</div><div className="mt-1 text-xs font-semibold">{label}</div><div className="mt-1 text-[10px] text-muted-foreground">{detail}</div></div>;
 }
 
@@ -773,7 +855,7 @@ function SourceDataSection({ transactions, filteredTransactions, findings, searc
 }
 
 function RiskBadge({ risk }: { risk: Risk }) {
-  const classes = risk === 'High' ? 'bg-[#f8dfd9] text-[#923c32]' : risk === 'Medium' ? 'bg-[#faedc7] text-[#89671c]' : 'bg-[#dceaf0] text-[#3f6877]';
+  const classes = risk === 'High' ? 'bg-[#f3e3e5] text-[#8b2635]' : risk === 'Medium' ? 'bg-[#f6edca] text-[#7b6211]' : 'bg-[#e6f0eb] text-[#2f5d50]';
   return <span className={`inline-flex rounded-full px-2 py-1 font-mono text-[9px] uppercase tracking-[.08em] ${classes}`} data-testid={`status-risk-${risk.toLowerCase()}`}>{risk}</span>;
 }
 
@@ -791,6 +873,10 @@ function LoadingRows() {
 }
 
 function InvestigationPanel({ finding }: { finding: Finding | null }) {
+  const [activeTab, setActiveTab] = useState<'details' | 'trail'>('details');
+  useEffect(() => {
+    setActiveTab('details');
+  }, [finding?.id]);
   if (!finding) return <div className="rounded-xl border border-dashed border-border bg-muted/40 p-6"><div className="flex items-center gap-2 text-muted-foreground"><PanelRightOpen size={17} /><span className="font-mono text-[10px] uppercase tracking-[.14em]">Investigation panel</span></div><div className="py-12 text-center"><div className="font-serif text-lg font-bold">Select a finding</div><p className="mt-2 text-xs leading-5 text-muted-foreground">Choose an exception from the register to see the rule, context, and suggested follow-up.</p></div></div>;
   return (
     <aside className="rounded-xl border border-[#b9c7b3] bg-[#edf1e7] p-5 shadow-sm sm:p-6" data-testid={`panel-investigation-${finding.id}`}>
@@ -801,14 +887,18 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
         </div>
         <RiskBadge risk={finding.risk} />
       </div>
-       <div className="py-5">
-         <div className="font-serif text-[22px] font-bold leading-tight tracking-[-.03em]">{finding.exceptions.length ? `${finding.exceptions.length} ${finding.exceptions.length === 1 ? 'test' : 'tests'} triggered` : 'No automated tests triggered'}</div>
-         <p className="mt-2 text-xs leading-5 text-[#536659]">{finding.exceptions.length ? 'Review each test below. The displayed risk is the highest level triggered by this transaction.' : 'This transaction is available for direct review even though it did not match an automated exception rule.'}</p>
-       </div>
-      <div className="space-y-4">
+      <div className="mb-5 mt-4 grid grid-cols-2 border-b border-[#cdd8c8]" role="tablist" aria-label="Investigation views">
+        <button type="button" role="tab" aria-selected={activeTab === 'details'} onClick={() => setActiveTab('details')} className={`border-b-2 px-2 py-2.5 text-left text-xs font-semibold transition-colors ${activeTab === 'details' ? 'border-[#1b2a4a] text-[#1b2a4a]' : 'border-transparent text-[#536659] hover:text-[#1b2a4a]'}`} data-testid={`tab-investigation-details-${finding.id}`}>Details</button>
+        <button type="button" role="tab" aria-selected={activeTab === 'trail'} onClick={() => setActiveTab('trail')} className={`border-b-2 px-2 py-2.5 text-left text-xs font-semibold transition-colors ${activeTab === 'trail' ? 'border-[#1b2a4a] text-[#1b2a4a]' : 'border-transparent text-[#536659] hover:text-[#1b2a4a]'}`} data-testid={`tab-investigation-trail-${finding.id}`}>Follow the Money</button>
+      </div>
+      {activeTab === 'details' ? <div className="space-y-4">
+        <div className="pb-1">
+          <div className="font-serif text-[22px] font-bold leading-tight tracking-[-.03em]">{finding.exceptions.length ? `${finding.exceptions.length} ${finding.exceptions.length === 1 ? 'test' : 'tests'} triggered` : 'No automated tests triggered'}</div>
+          <p className="mt-2 text-xs leading-5 text-[#536659]">{finding.exceptions.length ? 'Review each test below. The displayed risk is the highest level triggered by this transaction.' : 'This transaction is available for direct review even though it did not match an automated exception rule.'}</p>
+        </div>
         <InvestigationBlock label="Tests triggered">
-           {finding.exceptions.length ? <div className="space-y-3">
-             {finding.exceptions.map((exception) => (
+          {finding.exceptions.length ? <div className="space-y-3">
+            {finding.exceptions.map((exception) => (
               <div key={exception.type} className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-3" data-testid={`detail-exception-${finding.id}-${exception.type.toLowerCase().replace(/\s/g, '-')}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <ExceptionTag type={exception.type} />
@@ -835,10 +925,10 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
                   <span><span className="font-semibold">Suggested follow-up:</span> {exception.followUp}</span>
                 </div>
               </div>
-             ))}
-           </div> : <div className="rounded-md border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-3 text-xs leading-5 text-[#536659]">No exception tests matched this transaction in the current review.</div>}
+            ))}
+          </div> : <div className="rounded-md border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-3 text-xs leading-5 text-[#536659]">No exception tests matched this transaction in the current review.</div>}
         </InvestigationBlock>
-        <InvestigationBlock label="Transaction">
+        <InvestigationBlock label="Transaction context">
           <div className="grid grid-cols-2 gap-y-3 rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-3">
             <DataPoint label="Date" value={dateLabel(finding.date)} />
             <DataPoint label="Amount" value={currency(finding.amount)} />
@@ -846,9 +936,8 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
             <DataPoint label="Account" value={finding.account.split(' · ')[1] ?? finding.account} />
           </div>
         </InvestigationBlock>
-        <FollowMoneyTrail finding={finding} />
         {finding.related.length > 0 && <InvestigationBlock label="Related transactions"><div className="flex flex-wrap gap-2">{finding.related.map((id) => <span key={id} className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] px-2 py-1 font-mono text-[10px] text-primary">{id}</span>)}</div></InvestigationBlock>}
-      </div>
+      </div> : <FollowMoneyTrail finding={finding} />}
     </aside>
   );
 }
@@ -858,62 +947,70 @@ function InvestigationBlock({ label, children }: { label: string; children: Reac
 }
 
 function DataPoint({ label, value }: { label: string; value: string }) {
-  return <div><div className="font-mono text-[9px] uppercase tracking-[.1em] text-[#718272]">{label}</div><div className="mt-1 truncate pr-2 text-xs font-medium" title={value}>{value}</div></div>;
+  const isMoney = label.toLowerCase().includes('amount') || value.includes('$');
+  return <div><div className="font-mono text-[9px] uppercase tracking-[.1em] text-[#718272]">{label}</div><div className={`mt-1 truncate pr-2 text-xs font-medium ${isMoney ? 'font-mono' : ''}`} title={value}>{value}</div></div>;
 }
 
 function SupportingFileCard({ label, fileName, rowCount, onClick }: { label: string; fileName: string; rowCount: number; onClick: () => void }) {
   return <button onClick={onClick} className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-left transition hover:border-primary/50 hover:bg-[#eef2e9]" type="button"><div className="text-[11px] font-semibold">{label}</div><div className="mt-1 truncate font-mono text-[9px] text-primary" title={fileName}>{fileName}</div><div className="mt-1 text-[10px] text-muted-foreground">{rowCount.toLocaleString()} rows · Replace</div></button>;
 }
 
+type TrailStepKey = 'gl' | 'invoice' | 'vendor' | 'payment';
+
 function FollowMoneyTrail({ finding }: { finding: Finding }) {
   const trail = finding.moneyTrail;
+  const [activeStep, setActiveStep] = useState<TrailStepKey>('gl');
+  useEffect(() => {
+    setActiveStep('gl');
+  }, [finding.id]);
+  const stepIsMissing = (step: TrailStepKey) => step !== 'gl' && !trail?.[step === 'invoice' ? 'invoice' : step === 'vendor' ? 'vendor' : 'payment'];
+  const detail = activeStep === 'gl'
+    ? <div className="grid grid-cols-2 gap-y-3"><DataPoint label="Amount" value={currency(finding.amount)} /><DataPoint label="Posted" value={dateLabel(finding.date)} /><DataPoint label="Account" value={finding.account} /><DataPoint label="Vendor" value={finding.vendor} /></div>
+    : activeStep === 'invoice' && trail?.invoice
+      ? <div className="grid grid-cols-2 gap-y-3"><DataPoint label="Invoice number" value={trail.invoice.invoiceNumber} /><DataPoint label="Invoice date" value={dateLabel(trail.invoice.invoiceDate)} /><DataPoint label="Amount" value={currency(trail.invoice.amount)} /><DataPoint label="Invoice ID" value={trail.invoice.invoiceId} /></div>
+      : activeStep === 'vendor' && trail?.vendor
+        ? <div className="grid grid-cols-2 gap-y-3"><DataPoint label="Name" value={trail.vendor.vendorName} /><DataPoint label="Created" value={dateLabel(trail.vendor.createdDate)} /><DataPoint label="Primary account" value={trail.vendor.primaryAccount} /><DataPoint label="Status" value={trail.vendor.status} /><DataPoint label="Bank account ref" value={trail.vendor.bankAccountRef} /></div>
+        : activeStep === 'payment' && trail?.payment
+          ? <div className="grid grid-cols-2 gap-y-3"><DataPoint label="Payment date" value={dateLabel(trail.payment.paymentDate)} /><DataPoint label="Amount" value={currency(trail.payment.amount)} /><DataPoint label="Bank account ref" value={trail.payment.bankAccountRef} /><DataPoint label="Payment ID" value={trail.payment.paymentId} /></div>
+          : <div className="text-xs leading-5 text-[#8b2635]">This link is missing from the loaded supporting files. The gap is retained so the trail can be followed back to source.</div>;
+  const identifiers: Record<TrailStepKey, string> = {
+    gl: finding.id,
+    invoice: trail?.invoice?.invoiceId ?? 'No link',
+    vendor: trail?.vendor?.vendorId ?? 'No link',
+    payment: trail?.payment?.paymentId ?? 'No link',
+  };
+  const labels: Record<TrailStepKey, string> = { gl: 'GL entry', invoice: 'Invoice', vendor: 'Vendor', payment: 'Payment' };
   return (
     <InvestigationBlock label="Follow the money">
-      <div className="space-y-2" data-testid={`money-trail-${finding.id}`}>
-        <TrailStep label="GL entry" identifier={finding.id}>
-          <DataPoint label="Amount" value={currency(finding.amount)} />
-          <DataPoint label="Posted" value={dateLabel(finding.date)} />
-          <DataPoint label="Account" value={finding.account} />
-        </TrailStep>
-        <TrailConnector />
-        {trail?.invoice ? <TrailStep label="Invoice" identifier={trail.invoice.invoiceId}>
-          <DataPoint label="Invoice number" value={trail.invoice.invoiceNumber} />
-          <DataPoint label="Invoice date" value={dateLabel(trail.invoice.invoiceDate)} />
-          <DataPoint label="Amount" value={currency(trail.invoice.amount)} />
-        </TrailStep> : <MissingTrailStep label="Invoice" message="No invoice matched this GL transaction ID." />}
-        <TrailConnector />
-        {trail?.vendor ? <TrailStep label="Vendor" identifier={trail.vendor.vendorId}>
-          <DataPoint label="Name" value={trail.vendor.vendorName} />
-          <DataPoint label="Created" value={dateLabel(trail.vendor.createdDate)} />
-          <DataPoint label="Primary account" value={trail.vendor.primaryAccount} />
-          <DataPoint label="Status" value={trail.vendor.status} />
-          <DataPoint label="Bank account ref" value={trail.vendor.bankAccountRef} />
-        </TrailStep> : <MissingTrailStep label="Vendor" message="No vendor matched the linked invoice." />}
-        <TrailConnector />
-        {trail?.payment ? <TrailStep label="Payment" identifier={trail.payment.paymentId}>
-          <DataPoint label="Payment date" value={dateLabel(trail.payment.paymentDate)} />
-          <DataPoint label="Amount" value={currency(trail.payment.amount)} />
-          <DataPoint label="Bank account ref" value={trail.payment.bankAccountRef} />
-        </TrailStep> : <MissingTrailStep label="Payment" message="No payment matched the linked invoice." />}
+      <div data-testid={`money-trail-${finding.id}`}>
+        <div className="mb-3 text-xs leading-5 text-[#536659]">Select a step to inspect the linked record. Gaps are shown explicitly rather than inferred.</div>
+        <div className="trail-flow">
+          {(['gl', 'invoice', 'vendor', 'payment'] as TrailStepKey[]).map((step, index) => (
+            <TrailNode key={step} label={labels[step]} identifier={identifiers[step]} index={index + 1} missing={stepIsMissing(step)} selected={activeStep === step} onClick={() => setActiveStep(step)} findingId={finding.id} />
+          ))}
+        </div>
+        <div className={`trail-detail mt-3 p-3 ${stepIsMissing(activeStep) ? 'trail-detail-missing' : ''}`} data-testid={`trail-detail-${finding.id}-${activeStep}`}>
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-[#dfe5da] pb-2">
+            <span className="font-serif text-lg font-semibold text-[#1b2a4a]">{labels[activeStep]}</span>
+            <span className="font-mono text-[10px] text-[#2f5d50]">{identifiers[activeStep]}</span>
+          </div>
+          {detail}
+        </div>
       </div>
-      {trail?.flags.length ? <div className="mt-3 space-y-2" data-testid={`money-trail-flags-${finding.id}`}>
-        {trail.flags.map((flag) => <div key={flag.message} className="flex items-start gap-2 rounded-md border border-[#e2c68f] bg-[#fff8e5] p-2.5 text-[11px] leading-5 text-[#73551a]"><AlertCircle size={14} className="mt-0.5 shrink-0" /><span>{flag.message}{flag.detail && <span className="mt-0.5 block text-[10px] text-[#89671c]">{flag.detail}</span>}</span></div>)}
-      </div> : trail && <div className="mt-3 rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-[11px] leading-5 text-[#536659]">No trail red flags detected for this transaction.</div>}
-      {!trail && <div className="mt-3 rounded-md border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-[11px] leading-5 text-[#536659]">No invoice is linked to this GL entry in the loaded supporting files.</div>}
+      {trail?.flags.length ? <div className="mt-4 space-y-2" data-testid={`money-trail-flags-${finding.id}`}>
+        <div className="font-mono text-[9px] tracking-[.12em] text-[#8b2635]">Trail flags</div>
+        {trail.flags.map((flag) => <div key={flag.message} className="trail-flag flex items-start gap-2 border p-2.5 text-[11px] leading-5 text-[#73551a]"><AlertCircle size={14} className="mt-0.5 shrink-0 text-[#c9a227]" /><span><strong className="font-semibold">Review signal:</strong> {flag.message}{flag.detail && <span className="mt-0.5 block text-[10px] text-[#89671c]">{flag.detail}</span>}</span></div>)}
+      </div> : trail && <div className="mt-4 border border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-[11px] leading-5 text-[#536659]">No trail red flags detected for this transaction.</div>}
+      {!trail && <div className="mt-4 border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-2.5 text-[11px] leading-5 text-[#536659]">No invoice is linked to this GL entry in the loaded supporting files.</div>}
     </InvestigationBlock>
   );
 }
 
-function TrailStep({ label, identifier, children }: { label: string; identifier: string; children: ReactNode }) {
-  return <div className="rounded-md border border-[#cdd8c8] bg-[#f7f8f1] p-3"><div className="mb-3 flex items-center justify-between gap-2"><span className="font-mono text-[9px] uppercase tracking-[.14em] text-primary">{label}</span><span className="font-mono text-[10px] font-medium text-primary">{identifier}</span></div><div className="grid grid-cols-2 gap-x-3 gap-y-3">{children}</div></div>;
-}
-
-function MissingTrailStep({ label, message }: { label: string; message: string }) {
-  return <div className="rounded-md border border-dashed border-[#cdd8c8] bg-[#f7f8f1] p-3"><div className="font-mono text-[9px] uppercase tracking-[.14em] text-primary">{label}</div><div className="mt-2 text-[11px] leading-5 text-muted-foreground">{message}</div></div>;
-}
-
-function TrailConnector() {
-  return <div className="ml-4 h-3 w-px bg-[#b9c7b3]" aria-hidden="true" />;
+function TrailNode({ label, identifier, index, missing, selected, onClick, findingId }: { label: string; identifier: string; index: number; missing: boolean; selected: boolean; onClick: () => void; findingId: string }) {
+  return <button type="button" onClick={onClick} className="trail-node" data-selected={selected} data-missing={missing} aria-pressed={selected} data-testid={`button-trail-step-${findingId}-${label.toLowerCase().replace(/\s/g, '-')}`}>
+    <span className="trail-node-index">{String(index).padStart(2, '0')}</span>
+    <span className="min-w-0"><span className="block text-xs font-semibold text-[#1b2a4a]">{label}</span><span className={`mt-1 block truncate font-mono text-[9px] ${missing ? 'text-[#8b2635]' : 'text-[#2f5d50]'}`}>{identifier}</span><span className="mt-1 block text-[10px] text-[#536659]">{missing ? 'Missing link' : 'Linked record'}</span></span>
+  </button>;
 }
 
 const queryClient = new QueryClient();
