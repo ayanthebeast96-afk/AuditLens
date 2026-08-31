@@ -516,6 +516,8 @@ function App() {
   const [hasStartedReview, setHasStartedReview] = useState(false);
   const [activeNav, setActiveNav] = useState('overview');
   const [selectedId, setSelectedId] = useState<string | null>('GL-2407');
+  const [isInvestigationOpen, setIsInvestigationOpen] = useState(false);
+  const [returnScrollY, setReturnScrollY] = useState(0);
   const [search, setSearch] = useState('');
   const [sourceSearch, setSourceSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState<'All risks' | Risk>('All risks');
@@ -626,10 +628,34 @@ function App() {
     reader.readAsText(file);
     event.target.value = '';
   };
-  const selectTransaction = (id: string) => {
-    setSelectedId(id);
-    window.setTimeout(() => document.getElementById('investigation-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  const goToAbout = () => {
+    setHasStartedReview(false);
+    setMobileNav(false);
+    setIsInvestigationOpen(false);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
+  const selectTransaction = (id: string) => {
+    setReturnScrollY(window.scrollY);
+    setSelectedId(id);
+    setIsInvestigationOpen(true);
+  };
+  const closeInvestigation = () => {
+    setIsInvestigationOpen(false);
+    window.setTimeout(() => window.scrollTo({ top: returnScrollY, behavior: 'auto' }), 0);
+  };
+  useEffect(() => {
+    if (!isInvestigationOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeInvestigation();
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isInvestigationOpen, returnScrollY]);
   const exportFindings = () => {
     const header = 'Transaction ID,Date,Account,Vendor,Amount,Exception Type,Risk\n';
     const body = findings.map((finding) => [finding.id, finding.date, finding.account, finding.vendor, finding.amount, finding.exceptions.map((exception) => exception.type).join('; '), finding.risk].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -651,13 +677,13 @@ function App() {
     return (
       <div className="landing-shell audit-noise" data-testid="landing-state">
         <header className="landing-header flex items-center justify-between px-5 py-5 sm:px-10 lg:px-16">
-          <div className="flex items-center gap-3">
+          <button type="button" onClick={goToAbout} className="flex items-center gap-3 text-left" aria-label="Go to AuditLens About page" data-testid="button-about-logo">
             <div className="landing-mark" aria-hidden="true"><Landmark size={18} strokeWidth={2.2} /></div>
             <div>
               <div className="font-serif text-[22px] font-semibold leading-none tracking-[-.04em] text-[#1b2a4a]">AuditLens</div>
               <div className="mt-1 font-mono text-[9px] tracking-[.13em] text-[#2f5d50]">Local review workspace</div>
             </div>
-          </div>
+          </button>
           <div className="hidden items-center gap-2 font-mono text-[10px] tracking-[.1em] text-[#26282b]/55 sm:flex">
             <LockKeyhole size={13} /> private by default
           </div>
@@ -736,10 +762,10 @@ function App() {
       <input ref={invoiceFileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => handleSupportingFile('invoice', event)} data-testid="input-invoices-file" />
       <input ref={paymentFileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => handleSupportingFile('payment', event)} data-testid="input-payments-file" />
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-[248px] flex-col bg-sidebar text-sidebar-foreground transition-transform duration-300 lg:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-6">
+        <button type="button" onClick={goToAbout} className="flex items-center gap-3 border-b border-sidebar-border px-6 py-6 text-left transition-colors hover:bg-sidebar-accent/60" aria-label="Go to AuditLens About page" data-testid="button-workspace-logo">
           <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-sidebar-primary text-sidebar-primary-foreground"><Landmark size={19} strokeWidth={2.5} /></div>
           <div><div className="font-serif text-[19px] font-bold tracking-[-.03em]">AuditLens</div><div className="font-mono text-[9px] uppercase tracking-[.16em] text-sidebar-foreground/55">ledger intelligence</div></div>
-        </div>
+        </button>
         <div className="px-4 pt-8">
           <div className="mb-3 px-3 font-mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/40">Workspace</div>
           <nav className="space-y-1">
@@ -752,10 +778,6 @@ function App() {
         <div className="mt-8 px-4">
           <div className="mb-3 px-3 font-mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/40">Controls</div>
           <button onClick={() => document.getElementById('rules-section')?.scrollIntoView({ behavior: 'smooth' })} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-sidebar-foreground/65 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-foreground" data-testid="button-nav-rules"><SlidersHorizontal size={16} /><span>Test configuration</span></button>
-        </div>
-        <div className="mt-auto px-6 pb-7">
-          <div className="mb-5 h-px bg-sidebar-border" />
-          <div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d4dfb1] font-mono text-xs font-medium text-sidebar">AS</div><div><div className="text-xs font-medium">Alex Morgan</div><div className="font-mono text-[10px] text-sidebar-foreground/45">portfolio workspace</div></div></div>
         </div>
       </aside>
       {mobileNav && <button className="fixed inset-0 z-20 bg-sidebar/30 lg:hidden" onClick={() => setMobileNav(false)} aria-label="Close navigation" data-testid="button-close-navigation" />}
@@ -770,16 +792,29 @@ function App() {
             <div className="flex shrink-0 items-center gap-2"><button onClick={useSample} className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3.5 py-2.5 text-xs font-semibold shadow-sm transition hover:-translate-y-px hover:border-primary/40" data-testid="button-use-sample"><RotateCcw size={14} /> Reset to sample</button><button onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:brightness-105" data-testid="button-upload-csv"><Upload size={14} /> Upload CSV</button></div>
           </section>
 
-           <section id="supporting-files-section" className="audit-rise audit-delay-1 mb-8 grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
-             <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
-              <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div><div className="mb-2 flex items-center gap-2"><FileCheck2 size={17} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Source ledger</span></div><div className="flex flex-wrap items-center gap-3"><h2 className="text-base font-semibold">{fileName}</h2><span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Loaded</span></div><p className="mt-2 text-xs text-muted-foreground">{transactions.length} rows · fictional data · ready for local analysis</p></div><button onClick={() => fileInput.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold transition hover:bg-muted" data-testid="button-replace-csv"><Upload size={14} /> Replace file</button></div>
-               {uploadError && <div className="relative mt-5 flex items-start gap-3 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-upload-error"><AlertCircle size={16} className="mt-0.5 shrink-0" /><div><div className="font-semibold">We could not load that ledger</div><div className="mt-1 leading-5">{uploadError}</div></div><button onClick={() => setUploadError('')} className="ml-auto p-1" aria-label="Dismiss upload error" data-testid="button-dismiss-upload-error"><X size={14} /></button></div>}
-               <div className="relative mt-6 border-t border-border/80 pt-5">
-                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                   <div>
-                     <div className="mb-1 flex items-center gap-2"><Landmark size={15} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Follow the money</span></div>
-                     <p className="text-xs leading-5 text-muted-foreground">Link local invoices, vendors, and payments to the GL entry in each investigation.</p>
+           <section id="supporting-files-section" className="audit-rise audit-delay-1 mb-8">
+             <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+               <div className="grid gap-6 border-b border-border pb-6 xl:grid-cols-[1fr_360px]">
+                 <div>
+                   <div className="mb-2 flex items-center gap-2"><FileCheck2 size={17} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Source ledger</span></div>
+                   <div className="flex flex-wrap items-center gap-3"><h2 className="text-base font-semibold">{fileName}</h2><span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Loaded</span></div>
+                   <p className="mt-2 text-xs text-muted-foreground">{transactions.length} rows · fictional data · ready for local analysis</p>
+                   <div className="mt-5 flex flex-wrap items-center gap-3">
+                     <button onClick={() => fileInput.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110" data-testid="button-replace-csv"><Upload size={14} /> Replace ledger</button>
+                     <span className="font-mono text-[10px] text-muted-foreground">CSV only · analyzed in this browser</span>
                    </div>
+                   {uploadError && <div className="mt-5 flex items-start gap-3 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-upload-error"><AlertCircle size={16} className="mt-0.5 shrink-0" /><div><div className="font-semibold">We could not load that ledger</div><div className="mt-1 leading-5">{uploadError}</div></div><button onClick={() => setUploadError('')} className="ml-auto p-1" aria-label="Dismiss upload error" data-testid="button-dismiss-upload-error"><X size={14} /></button></div>}
+                 </div>
+                 <div id="rules-section" className="border-t border-border pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                   <div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><Settings2 size={16} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-primary">Review control</span></div><CircleHelp size={15} className="text-muted-foreground" /></div>
+                   <label htmlFor="approval-threshold" className="text-xs font-semibold text-foreground">Approval threshold</label>
+                   <div className="mt-2 flex gap-2"><div className="relative flex-1"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-muted-foreground">$</span><input id="approval-threshold" value={draftThreshold} onChange={(event) => setDraftThreshold(event.target.value.replace(/[^\d]/g, ''))} className="w-full rounded-md border border-[#c5ccad] bg-background py-2.5 pl-7 pr-3 font-mono text-sm outline-none ring-primary/20 transition focus:ring-2" data-testid="input-approval-threshold" /></div><button onClick={runAnalysis} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-60" disabled={isAnalyzing} data-testid="button-run-analysis">{isAnalyzing ? <Clock3 size={14} className="audit-pulse" /> : <Play size={14} />} {isAnalyzing ? 'Running' : 'Run tests'}</button></div>
+                   <p className="mt-2 font-mono text-[10px] leading-4 text-muted-foreground">Proximity test flags entries from {currency(Math.max(0, Number(draftThreshold || 0) * .95))} to just below threshold.</p>
+                 </div>
+               </div>
+               <div className="border-b border-border py-6">
+                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                   <div><div className="mb-1 flex items-center gap-2"><Landmark size={15} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-muted-foreground">Follow the money</span></div><p className="text-xs leading-5 text-muted-foreground">Link local invoices, vendors, and payments to the GL entry in each investigation.</p></div>
                    <span className="rounded-full bg-[#e5efd4] px-2 py-1 font-mono text-[9px] uppercase tracking-[.1em] text-[#49623f]">Local files</span>
                  </div>
                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -790,9 +825,26 @@ function App() {
                  <p className="mt-3 font-mono text-[10px] leading-4 text-muted-foreground">{transactions.filter((transaction) => moneyTrailMap.has(transaction.id)).length.toLocaleString()} invoice links available for the loaded GL · vendor bank-account and invoice-number checks run locally.</p>
                  {supportingFileError && <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#e6b9b0] bg-[#fcf0ed] p-3 text-xs text-[#8d3c31]" data-testid="status-supporting-file-error"><AlertCircle size={15} className="mt-0.5 shrink-0" /><span>{supportingFileError}</span><button onClick={() => setSupportingFileError('')} className="ml-auto p-1" aria-label="Dismiss supporting file error"><X size={14} /></button></div>}
                </div>
-            </div>
-            <div id="rules-section" className="rounded-xl border border-border bg-[#e9ecda] p-5 shadow-sm sm:p-6"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><Settings2 size={16} className="text-primary" /><span className="font-mono text-[10px] uppercase tracking-[.16em] text-primary">Review control</span></div><CircleHelp size={15} className="text-muted-foreground" /></div><label htmlFor="approval-threshold" className="text-xs font-semibold text-foreground">Approval threshold</label><div className="mt-2 flex gap-2"><div className="relative flex-1"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-muted-foreground">$</span><input id="approval-threshold" value={draftThreshold} onChange={(event) => setDraftThreshold(event.target.value.replace(/[^\d]/g, ''))} className="w-full rounded-md border border-[#c5ccad] bg-background py-2.5 pl-7 pr-3 font-mono text-sm outline-none ring-primary/20 transition focus:ring-2" data-testid="input-approval-threshold" /></div><button onClick={runAnalysis} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-60" disabled={isAnalyzing} data-testid="button-run-analysis">{isAnalyzing ? <Clock3 size={14} className="audit-pulse" /> : <Play size={14} />} {isAnalyzing ? 'Running' : 'Run tests'}</button></div><p className="mt-2 font-mono text-[10px] leading-4 text-muted-foreground">Proximity test flags entries from {currency(Math.max(0, Number(draftThreshold || 0) * .95))} to just below threshold.</p></div>
-          </section>
+               <div className="pt-6" data-testid="expected-file-format">
+                 <div className="mb-4 flex items-center gap-2"><FileText size={16} className="text-primary" /><div><div className="font-mono text-[10px] uppercase tracking-[.16em] text-primary">Expected file format</div><p className="mt-1 text-xs text-muted-foreground">Use these headers exactly. Supporting files are optional and power Follow the Money linking.</p></div></div>
+                 <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
+                   <div>
+                     <div className="mb-2 text-xs font-semibold">Main ledger CSV</div>
+                     <code className="block overflow-x-auto whitespace-nowrap rounded-md bg-[#f1f0e9] px-3 py-2 font-mono text-[10px] leading-5 text-[#536659]">id,date,account,vendor,amount,description</code>
+                     <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-md border border-border/70 bg-background px-3 py-2 font-mono text-[10px] leading-5 text-[#536659]">GL-2401,2024-06-03,6100 · Facilities,Northstar Facilities,8420,June building services</code>
+                   </div>
+                   <div>
+                     <div className="mb-2 text-xs font-semibold">Optional Follow the Money files</div>
+                     <div className="space-y-2 text-[10px] leading-5 text-[#536659]">
+                       <div><span className="font-mono font-semibold text-primary">vendor_master.csv:</span> vendor_id, vendor_name, created_date, primary_account, bank_account_ref, status</div>
+                       <div><span className="font-mono font-semibold text-primary">invoices.csv:</span> invoice_id, invoice_number, vendor_id, gl_transaction_id, invoice_date, amount</div>
+                       <div><span className="font-mono font-semibold text-primary">payments.csv:</span> payment_id, invoice_id, payment_date, amount, bank_account_ref</div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           </section>
 
            <section className="audit-rise audit-delay-2 mb-9 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
             <Metric label="Transactions analyzed" value={transactions.length.toLocaleString()} detail="in supplied ledger" icon={FileText} />
@@ -813,13 +865,17 @@ function App() {
             </div>
           </section>
 
-          <section className="audit-rise audit-delay-4 grid gap-6 xl:grid-cols-[1fr_380px]">
+           <section className="audit-rise audit-delay-4">
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6"><div className="mb-5 flex items-start justify-between"><div><div className="mb-1 font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">02 / Test logic</div><h2 className="font-serif text-2xl font-bold tracking-[-.03em]">Transparent by design</h2></div><div className="rounded-md bg-[#e9ecda] p-2 text-primary"><ClipboardCheck size={18} /></div></div><div className="grid gap-3 md:grid-cols-2">{testDefinitions.map((test, index) => <div key={test.type} className="flex gap-3 rounded-lg border border-border/80 bg-background p-3.5"><div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-medium ${index === 0 ? 'bg-[#f8dfd9] text-[#8d3c31]' : index === 1 ? 'bg-[#faedc7] text-[#89671c]' : index === 2 ? 'bg-[#dceaf0] text-[#3f6877]' : index === 3 ? 'bg-[#e8dced] text-[#6b4777]' : 'bg-[#e5efd4] text-[#49623f]'}`}>{String(index + 1).padStart(2, '0')}</div><div><div className="text-xs font-semibold">{test.label}</div><div className="mt-1 text-[11px] leading-4 text-muted-foreground">{test.rule}</div></div></div>)}</div><div className="mt-5 flex items-start gap-2 border-t border-border pt-4 text-[11px] leading-5 text-muted-foreground"><CircleHelp size={14} className="mt-0.5 shrink-0 text-primary" /> Tests are intentionally deterministic. They do not infer intent, contact external services, or replace professional judgment.</div></div>
-            <InvestigationPanel finding={selected} />
           </section>
           <footer className="mt-10 flex flex-col justify-between gap-2 border-t border-border pt-5 font-mono text-[10px] uppercase tracking-[.1em] text-muted-foreground sm:flex-row"><span>AuditLens / fictional portfolio workspace</span><span>Client-side analysis · no data leaves this browser</span></footer>
         </div>
       </main>
+       {isInvestigationOpen && selected && <div className="fixed inset-0 z-50 flex justify-end bg-[#1b2a4a]/45" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeInvestigation(); }}>
+         <div className="h-full w-full max-w-[760px] overflow-y-auto bg-[#edf1e7] p-4 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="investigation-dialog-title">
+           <InvestigationPanel finding={selected} onClose={closeInvestigation} />
+         </div>
+       </div>}
     </div>
   );
 }
@@ -877,7 +933,7 @@ function LoadingRows() {
   return <div className="space-y-0" data-testid="status-analysis-loading">{Array.from({ length: 5 }, (_, index) => <div key={index} className="flex items-center gap-5 border-b border-border/70 px-4 py-5 last:border-0"><div className="h-8 w-20 animate-pulse rounded bg-muted" /><div className="h-8 w-24 animate-pulse rounded bg-muted" /><div className="h-8 flex-1 animate-pulse rounded bg-muted" /><div className="h-8 w-20 animate-pulse rounded bg-muted" /><div className="h-8 w-28 animate-pulse rounded bg-muted" /></div>)}</div>;
 }
 
-function InvestigationPanel({ finding }: { finding: Finding | null }) {
+function InvestigationPanel({ finding, onClose }: { finding: Finding | null; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<'details' | 'trail'>('details');
   useEffect(() => {
     setActiveTab('details');
@@ -888,9 +944,12 @@ function InvestigationPanel({ finding }: { finding: Finding | null }) {
       <div className="flex items-center justify-between border-b border-[#cdd8c8] pb-4">
         <div>
           <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.15em] text-primary"><PanelRightOpen size={14} /> Investigation</div>
-          <div className="font-mono text-sm font-medium text-primary">{finding.id}</div>
+          <div id="investigation-dialog-title" className="font-mono text-sm font-medium text-primary">{finding.id}</div>
         </div>
-        <RiskBadge risk={finding.risk} />
+        <div className="flex items-center gap-3">
+          <RiskBadge risk={finding.risk} />
+          <button type="button" onClick={onClose} className="rounded-md p-2 text-[#536659] transition hover:bg-[#dfe5da] hover:text-[#1b2a4a]" aria-label="Close investigation" data-testid="button-close-investigation"><X size={18} /></button>
+        </div>
       </div>
       <div className="mb-5 mt-4 grid grid-cols-2 border-b border-[#cdd8c8]" role="tablist" aria-label="Investigation views">
         <button type="button" role="tab" aria-selected={activeTab === 'details'} onClick={() => setActiveTab('details')} className={`border-b-2 px-2 py-2.5 text-left text-xs font-semibold transition-colors ${activeTab === 'details' ? 'border-[#1b2a4a] text-[#1b2a4a]' : 'border-transparent text-[#536659] hover:text-[#1b2a4a]'}`} data-testid={`tab-investigation-details-${finding.id}`}>Details</button>

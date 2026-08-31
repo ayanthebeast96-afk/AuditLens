@@ -1,0 +1,50 @@
+Four specific fixes needed. Confirm each one individually when done, don't 
+just say "done" for the whole batch.
+
+1. TRANSACTION CLICK BEHAVIOR (bug fix)
+Right now, clicking a transaction row (from Exceptions or Source Data) 
+renders the investigation panel somewhere the user has to scroll down to 
+find. Fix this: clicking a row must open the investigation panel as a 
+slide-over panel or modal that appears immediately in the visible 
+viewport, no scrolling required to see it opened. Include a clear close 
+button (X or back arrow) that returns to the exact scroll position the 
+user was at in the underlying table.
+
+2. CSV FORMAT DOCUMENTATION (currently completely missing)
+Add a visible, always-shown "Expected file format" section directly in 
+the upload area of the workspace (not a tooltip, not hidden behind a 
+click). It must show:
+- Main ledger CSV columns: id, date, account, vendor, amount, description 
+  — with a one-line example row shown as sample text.
+- The three optional Follow the Money support files and their columns:
+  vendor_master.csv: vendor_id, vendor_name, created_date, primary_account, 
+  bank_account_ref, status
+  invoices.csv: invoice_id, invoice_number, vendor_id, gl_transaction_id, 
+  invoice_date, amount
+  payments.csv: payment_id, invoice_id, payment_date, amount, bank_account_ref
+This must be visible to someone who has never seen this app before and 
+doesn't know what data to prepare.
+
+3. LAYOUT RESTRUCTURE (this was requested before and not done — the 
+current page is still the exact same card grid with new colors, not a 
+restructure)
+Reduce the number of separate bordered/boxed cards on the main workspace 
+view. Specifically: merge the Source Ledger info, Review Control 
+(threshold), and Follow the Money file status into ONE cohesive layout 
+section, not three separate boxes sitting side by side. Remove card 
+borders/shadows where they're just visually dividing related information 
+that could instead be one unified panel with internal dividers or 
+sections.
+
+4. HOME/ABOUT PAGE (requested before, does not currently exist based on 
+the screenshots — confirm this explicitly)
+Confirm whether a separate About/Home page currently exists in the 
+codebase. If it does not exist, build one now: the AuditLens logo/name in 
+the top-left must link to this page. It should include the "Find the 
+entries worth a second look" headline, the six detection tests, the 
+"validated against 5,000 transactions, 100% detection rate" claim, and a 
+"Start Review" button leading into the workspace. This is a SEPARATE view 
+from the review workspace, not the same page.
+
+After completing all four, explicitly list which ones are done and show 
+me you can navigate to the About page by clicking the logo.
