@@ -229,7 +229,7 @@ function analyze(transactions: Transaction[], threshold: number, moneyTrailMap: 
       add(
         'Unusually large',
         'High',
-        `This transaction is ${currency(tx.amount)}. The typical range for ${tx.account} transactions is ${currency(accountStats.min)}–${currency(accountStats.max)} (average ${currency(accountStats.mean)}). This transaction is approximately ${standardDeviationsAboveMean.toFixed(1)} standard deviations above normal for this account.`,
+        `This transaction is ${currency(tx.amount)}. The average ${tx.account} transaction is ${currency(accountStats.mean)}, with a typical spread of about ${currency(accountStats.standardDeviation)} around that average. This transaction is approximately ${standardDeviationsAboveMean.toFixed(1)} standard deviations above the account average.`,
         `The account mean is ${currency(accountStats.mean)} with a population standard deviation of ${currency(accountStats.standardDeviation)}. The 3-standard-deviation review point is ${currency(accountStats.mean + 3 * accountStats.standardDeviation)}, and this transaction is above it.`,
         [],
         'Vouch to contract, invoice, receipt, and evidence of service delivery. Confirm authorization.',
